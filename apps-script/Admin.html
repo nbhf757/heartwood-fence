@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Heartwood Pricing Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:  #13245a;
+    --green: #7eb705;
+    --green2:#6aa004;
+    --cream: #f7f5f0;
+    --border:#d0d8e8;
+    --mid:   #5a6a8a;
+    --text:  #1a2340;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+
+  header {
+    background: var(--navy); padding: 14px 28px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 3px solid var(--green);
+  }
+  header h1 { color: #fff; font-size: 1.1rem; font-weight: 600; }
+  header span { color: rgba(255,255,255,0.5); font-size: 0.8rem; }
+
+  .toolbar {
+    padding: 12px 24px; background: #fff; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .btn {
+    padding: 7px 18px; border-radius: 6px; border: none; cursor: pointer;
+    font-size: 0.83rem; font-weight: 600; font-family: 'DM Sans', sans-serif;
+    transition: all .13s;
+  }
+  .btn-primary { background: var(--green); color: #fff; }
+  .btn-primary:hover { background: var(--green2); }
+  .btn-primary:disabled { background: #b0c870; cursor: not-allowed; }
+  .btn-secondary { background: var(--cream); color: var(--navy); border: 1.5px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--navy); }
+  .status-msg { font-size: 0.8rem; color: var(--mid); margin-left: auto; }
+  .status-msg.ok   { color: var(--green2); font-weight: 600; }
+  .status-msg.err  { color: #c0392b; font-weight: 600; }
+
+  .filter-row {
+    padding: 10px 24px; background: var(--cream); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .filter-row label { font-size: 0.78rem; font-weight: 600; color: var(--mid); }
+  .filter-row input {
+    padding: 5px 10px; border: 1.5px solid var(--border); border-radius: 5px;
+    font-size: 0.82rem; background: #fff; min-width: 220px;
+  }
+  .filter-row input:focus { outline: none; border-color: var(--green); }
+
+  .table-wrap { overflow-x: auto; padding: 16px 24px; }
+
+  table {
+    width: 100%; border-collapse: collapse; background: #fff;
+    border-radius: 10px; overflow: hidden;
+    box-shadow: 0 2px 10px rgba(19,36,90,0.08);
+    font-size: 0.82rem;
+  }
+  thead tr { background: var(--navy); }
+  th {
+    padding: 10px 12px; color: rgba(255,255,255,0.85); font-weight: 600;
+    text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em;
+    white-space: nowrap;
+  }
+  tbody tr:nth-child(even) { background: #fafbff; }
+  tbody tr:hover { background: #f0f5ff; }
+  td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  td:first-child { font-weight: 600; color: var(--navy); font-size: 0.78rem; font-family: monospace; }
+  td:last-child  { color: var(--mid); font-size: 0.75rem; max-width: 280px; }
+
+  .edit-input {
+    width: 100%; padding: 4px 7px; border: 1.5px solid var(--border); border-radius: 4px;
+    font-size: 0.82rem; font-family: 'DM Sans', sans-serif; background: #fff;
+    transition: border .12s;
+  }
+  .edit-input:focus { outline: none; border-color: var(--green); background: #fffef8; }
+  .edit-input.dirty { border-color: var(--green); background: #f9ffe8; }
+
+  .section-header td {
+    background: #e8f0ff; color: var(--navy); font-weight: 700; font-size: 0.78rem;
+    text-transform: uppercase; letter-spacing: 0.1em; padding: 8px 10px;
+    border-top: 2px solid var(--border);
+  }
+
+  .loading {
+    text-align: center; padding: 60px 20px; color: var(--mid); font-size: 0.9rem;
+  }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--navy); color: #fff; padding: 10px 22px; border-radius: 8px;
+    font-size: 0.85rem; font-weight: 600; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 999;
+    border-left: 4px solid var(--green);
+  }
+  .toast.show { opacity: 1; }
+  .toast.err  { border-left-color: #c0392b; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Heartwood Fence — Pricing Admin</h1>
+  <span id="user-email">Loading...</span>
+</header>
+
+<div class="toolbar">
+  <button class="btn btn-primary" id="save-btn" onclick="saveAll()" disabled>Save All Changes</button>
+  <button class="btn btn-secondary" onclick="loadData()">Reload from Sheet</button>
+  <span class="status-msg" id="status-msg">Loading pricing data...</span>
+</div>
+
+<div class="filter-row">
+  <label>Filter:</label>
+  <input type="text" id="filter-input" placeholder="Search keys or descriptions..." oninput="applyFilter()">
+</div>
+
+<div class="table-wrap">
+  <div class="loading" id="loading-msg">Loading pricing data from Google Sheet...</div>
+  <table id="pricing-table" style="display:none">
+    <thead>
+      <tr>
+        <th>Key</th>
+        <th>Default</th>
+        <th>VB</th>
+        <th>CIN</th>
+        <th>GRV</th>
+        <th>BSE</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody id="pricing-body"></tbody>
+  </table>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // Columns: 0=Key, 1=Default, 2=VB, 3=CIN, 4=GRV, 5=BSE, 6=Description
+  const BRANCH_COLS = [1, 2, 3, 4, 5]; // editable columns
+  let allRows = [];
+  let dirty   = false;
+
+  // Section headers — shown as visual separators in the table
+  const SECTION_MAP = {
+    'laborMin':      '— General / Labor',
+    'cogs200':       '— COGS Tiers',
+    'permitStd':     '— Permits',
+    'concretePunch': '— Hard Dig',
+    'woodMatGood':   '— Wood — Material & Labor',
+    'woodH4':        '— Wood — Height Modifiers',
+    'woodSecLen':    '— Wood — Section & Post Upgrades',
+    'woodGoodSupplier': '— Wood — Supplier Names',
+    'vinylMatGood':  '— Vinyl — Material & Labor',
+    'vinylH4':       '— Vinyl — Height Modifiers',
+    'vinylSecLen':   '— Vinyl — Section Length',
+    'vinylGoodSupplier': '— Vinyl — Supplier Names',
+    'alumMatGood':   '— Aluminum — Material & Labor',
+    'alumH4':        '— Aluminum — Height Modifiers',
+    'alumSecLen':    '— Aluminum — Section Length',
+    'alumGoodSupplier': '— Aluminum — Supplier Names',
+    'clMatGood':     '— Chain Link — Material & Labor',
+    'clH3':          '— Chain Link — Height Modifiers',
+    'clSecLen':      '— Chain Link — Section Length',
+    'clGoodSupplier':'— Chain Link — Supplier Names',
+    'gateWalkWood':  '— Gate Pricing',
+    'addonLattice':  '— Add-On Costs  [wood, vinyl, aluminum, chainlink]',
+  };
+
+  function loadData() {
+    document.getElementById('loading-msg').style.display = 'block';
+    document.getElementById('pricing-table').style.display = 'none';
+    setStatus('Loading...', '');
+
+    google.script.run
+      .withSuccessHandler(function(rows) {
+        allRows = rows;
+        dirty = false;
+        document.getElementById('save-btn').disabled = true;
+        renderTable(rows);
+        document.getElementById('loading-msg').style.display = 'none';
+        document.getElementById('pricing-table').style.display = 'table';
+        setStatus('Loaded ' + (rows.length - 1) + ' pricing keys', 'ok');
+      })
+      .withFailureHandler(function(err) {
+        setStatus('Error: ' + err.message, 'err');
+      })
+      .adminGetPricing();
+
+    // Show current user email
+    google.script.run
+      .withSuccessHandler(function(email) {
+        document.getElementById('user-email').textContent = email || '';
+      })
+      .withFailureHandler(function() {})
+      .getCurrentUserEmail();
+  }
+
+  function renderTable(rows) {
+    const tbody = document.getElementById('pricing-body');
+    tbody.innerHTML = '';
+
+    for (let r = 1; r < rows.length; r++) { // skip header row
+      const row = rows[r];
+      const key = row[0];
+      if (!key) continue;
+
+      // Insert section header if this key starts a new section
+      if (SECTION_MAP[key]) {
+        const sep = document.createElement('tr');
+        sep.className = 'section-header';
+        sep.innerHTML = '<td colspan="7">' + SECTION_MAP[key] + '</td>';
+        tbody.appendChild(sep);
+      }
+
+      const tr = document.createElement('tr');
+      tr.dataset.row = r;
+
+      // Key cell (read-only)
+      const tdKey = document.createElement('td');
+      tdKey.textContent = key;
+      tr.appendChild(tdKey);
+
+      // Editable value cells (Default + branches)
+      for (let c = 1; c <= 5; c++) {
+        const td = document.createElement('td');
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'edit-input';
+        inp.value = row[c] !== undefined ? row[c] : '';
+        inp.dataset.row = r;
+        inp.dataset.col = c;
+        inp.addEventListener('input', function() {
+          allRows[this.dataset.row][this.dataset.col] = this.value;
+          this.classList.add('dirty');
+          markDirty();
+        });
+        td.appendChild(inp);
+        tr.appendChild(td);
+      }
+
+      // Description cell (read-only)
+      const tdDesc = document.createElement('td');
+      tdDesc.textContent = row[6] || '';
+      tr.appendChild(tdDesc);
+
+      tbody.appendChild(tr);
+    }
+  }
+
+  function applyFilter() {
+    const q = document.getElementById('filter-input').value.toLowerCase();
+    const rows = document.querySelectorAll('#pricing-body tr:not(.section-header)');
+    rows.forEach(tr => {
+      const text = tr.textContent.toLowerCase();
+      tr.style.display = (!q || text.includes(q)) ? '' : 'none';
+    });
+  }
+
+  function saveAll() {
+    const btn = document.getElementById('save-btn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    setStatus('Saving to Google Sheet...', '');
+
+    google.script.run
+      .withSuccessHandler(function() {
+        dirty = false;
+        btn.textContent = 'Save All Changes';
+        // Clear dirty indicators
+        document.querySelectorAll('.edit-input.dirty').forEach(el => el.classList.remove('dirty'));
+        setStatus('Saved successfully', 'ok');
+        showToast('All changes saved!', false);
+      })
+      .withFailureHandler(function(err) {
+        btn.disabled = false;
+        btn.textContent = 'Save All Changes';
+        setStatus('Save failed: ' + err.message, 'err');
+        showToast('Save failed: ' + err.message, true);
+      })
+      .adminSaveAll(allRows);
+  }
+
+  function markDirty() {
+    if (!dirty) {
+      dirty = true;
+      document.getElementById('save-btn').disabled = false;
+      setStatus('Unsaved changes', '');
+    }
+  }
+
+  function setStatus(msg, cls) {
+    const el = document.getElementById('status-msg');
+    el.textContent = msg;
+    el.className = 'status-msg ' + (cls || '');
+  }
+
+  function showToast(msg, isErr) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isErr ? ' err' : '');
+    setTimeout(() => { t.className = 'toast'; }, 3000);
+  }
+
+  // Warn before leaving with unsaved changes
+  window.addEventListener('beforeunload', function(e) {
+    if (dirty) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  // Load on start
+  loadData();
+</script>
+</body>
+</html>
