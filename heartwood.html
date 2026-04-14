@@ -839,7 +839,7 @@ const FALLBACK = {
   concretePunch:25,coreDrill:50,surfaceMount:35,
   woodMatGood:10.314,woodMatBetter:13.702,woodMatBest:13.460,
   woodLaborGood:7,woodLaborBetter:7,woodLaborBest:7,woodFastener:0.25,
-  woodH4:0.90,woodH6:1.00,woodH8:1.25,woodSecLen:7,
+  woodH4:0.90,woodH6:1.00,woodH8:1.25,woodSecLen:8,
   postUpg4x6:1.67,postUpg6x6:3.23,postUpgPM:1.77,
   // Supplier names per tier — branch can override via Sheet
   woodGoodSupplier:"Good",    woodGoodDesc:"5/8\" Treated Pine",
@@ -1737,16 +1737,16 @@ function buildBOM(){
     //    Posts are ALWAYS Treated Pine regardless of fence material tier.
     //    Cedar fences do NOT use cedar posts (too expensive, PT pine is standard).
     //
-    //  RAIL LOGIC (branch-configurable):
-    //    VB standard:  4ft→2 rails, 6ft→3 rails, 8ft→4 rails  (2x4x8 PT Pine)
-    //    CIN cedar:    all heights → 2 rails only, cedar rails
-    //    Rail lumber:  2x4x8 (one per section, one section = 7-8ft between posts)
+    //  RAIL LOGIC:
+    //    Cedar (Best tier): always 2 rails — cedar lumber, all branches
+    //    PT Pine (Good/Better): always 3 rails — regardless of height
+    //    CIN cedar uses Local Lumber Co; all others source cedar locally
+    //    Rail lumber: 2x4x8 (one per section, 8ft between posts)
     //
     //  PICKET LOGIC:
     //    Good  (5/8x6): actual width 5.5" → 2.18 pickets/ft + 5% waste
     //    Better(3/4x6): actual width 5.5" → same count, heavier picket
-    //    Best  (Cedar): VB → cedar pickets only, PT pine everything else
-    //                   CIN → cedar pickets + cedar rails, 2-rail layout
+    //    Best  (Cedar): cedar pickets at all branches
     //
     //  CONCRETE: 2 bags (80lb) per post — standard for 4x4 posts in soil
     // ─────────────────────────────────────────────────────────────
@@ -1769,20 +1769,18 @@ function buildBOM(){
         postCostMap[postSize] || 12.60, 'Decks & Docks');
 
     // ── RAILS
-    // Cincinnati cedar: 2 rails only, cedar lumber
-    // All others: 2 rails for 4ft, 3 rails for 6ft, 4 rails for 8ft — PT Pine
+    // Cedar (Best): 2 rails per section, cedar lumber, all branches
+    // PT Pine (Good/Better): 3 rails per section, all branches
     let railsPerSec, railDesc, railCost, railSupplier;
-    if(isCedar && isCIN){
-      // CIN rule: cedar fences get 2 cedar rails regardless of height
+    if(isCedar){
       railsPerSec  = 2;
       railDesc     = '2x4x8 Rail — Cedar';
-      railCost     = 18.50; // UPDATE: enter your Cincinnati cedar rail cost
-      railSupplier = 'Local Lumber Co';
+      railCost     = isCIN ? 18.50 : 18.50; // UPDATE per branch: cedar rail cost
+      railSupplier = isCIN ? 'Local Lumber Co' : 'Local Lumber Co';
     } else {
-      // Standard: PT Pine rails, count by height
-      railsPerSec  = hft <= 4 ? 2 : hft <= 6 ? 3 : 4;
+      railsPerSec  = 3;
       railDesc     = '2x4x8 Rail — Treated Pine';
-      railCost     = 5.71; // UPDATE: enter your branch rail cost
+      railCost     = 5.71; // UPDATE per branch: PT pine rail cost
       railSupplier = 'Decks & Docks';
     }
     const totalRails = secs * railsPerSec;

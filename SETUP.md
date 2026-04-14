@@ -62,7 +62,7 @@ woodFastener	0.25				Wood fastener cost per linear foot
 woodH4	0.90				Wood height modifier — 4 ft
 woodH6	1.00				Wood height modifier — 6 ft (baseline)
 woodH8	1.25				Wood height modifier — 8 ft
-woodSecLen	7				Wood section length (feet)
+woodSecLen	8				Wood section length (feet)
 postUpg4x6	1.67				Post upgrade — 4x6 cost per linear foot
 postUpg6x6	3.23				Post upgrade — 6x6 cost per linear foot
 postUpgPM	1.77				Post upgrade — premium machine post per linear foot
