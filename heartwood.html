@@ -868,7 +868,7 @@ const FALLBACK = {
   gateCustomWood:52,gateCustomVinyl:95,gateCustomAlCl:35,
   addonLattice:[2.5,3.75,0,0],addonTopCap:[1.2,0,0,0],addonBob:[1.85,0,0,0],
   addonGaps:[-0.8,0,0,0],addonInset:[1.4,0,0,0],addonSpindle:[2.2,4.5,0,0],
-  addonHorizontal:[3.2,0,0,0],addonRanch:[-2,0,0,0],addonStiffener:[0,8.74,0,0],
+  addonHorizontal:[3.2,0,0,0],addonRanch:[-2,0,0,0],addonRanchMesh:[0,0,0,0],addonStiffener:[0,8.74,0,0],
   addonPostCap:[0,1.88,0,0],addonSolar:[0,3.75,0,0],addonColor:[0,5,2,0],
   addonPuppy:[0,0,6.5,0],addonSpear:[0,0,2.55,0],
   addonBarb:[0,0,0,1.2],addonSlats:[0,0,0,3.8],addonBlackMesh:[0,0,0,1.5],
@@ -898,6 +898,7 @@ const MAT_CONFIG = {
       {key:'addonSpindle',i:0,label:'Spindle Top Privacy'},
       {key:'addonHorizontal',i:0,label:'Horizontal Board'},
       {key:'addonRanch',i:0,label:'Ranch Rail'},
+      {key:'addonRanchMesh',i:0,label:'Ranch Rail — Add Mesh Fabric'},
     ],
   },
   vinyl:{
@@ -1768,93 +1769,96 @@ function buildBOM(){
     add('Posts', `${postSize}x${postLen} Post — Treated Pine`, totalPosts, 'EA',
         postCostMap[postSize] || 12.60, 'Decks & Docks');
 
-    // ── RAILS
-    // Cedar (Best): 2 rails per section, cedar lumber, all branches
-    // PT Pine (Good/Better): 3 rails per section, all branches
-    let railsPerSec, railDesc, railCost, railSupplier;
-    if(isCedar){
-      railsPerSec  = 2;
-      railDesc     = '2x4x8 Rail — Cedar';
-      railCost     = isCIN ? 18.50 : 18.50; // UPDATE per branch: cedar rail cost
-      railSupplier = isCIN ? 'Local Lumber Co' : 'Local Lumber Co';
-    } else {
-      railsPerSec  = 3;
-      railDesc     = '2x4x8 Rail — Treated Pine';
-      railCost     = 5.71; // UPDATE per branch: PT pine rail cost
-      railSupplier = 'Decks & Docks';
-    }
-    const totalRails = secs * railsPerSec;
-    add('Rails', railDesc, totalRails, 'EA', railCost, railSupplier);
+    const isRanch = state.addons.has('addonRanch:0');
 
-    // ── PICKETS
-    // 5/8x6 actual width = 5.5", 3/4x6 actual width = 5.5" (same count, diff thickness)
-    // Privacy fence = tight layout, no gaps between pickets
-    // picketsPerFt = 12 inches / 5.5 inches = ~2.18 pickets per linear foot
-    // +5% for field cuts and waste
-    const actualPicketInches = 5.5; // both 5/8x6 and 3/4x6 have 5.5" actual face
-    const picketsPerFt = (12 / actualPicketInches) * 1.05; // = ~2.29 per ft
-    const totalPickets = Math.ceil(lf * picketsPerFt);
-
-    // Picket species depends on tier AND branch:
-    // Good  → 5/8"x6" PT Pine dog ear
-    // Better → 3/4"x6" PT Pine dog ear
-    // Best/Cedar → cedar pickets (species same at all branches)
-    //   VB:  5/8"x6" cedar (Japanese cedar or Western Red Cedar)
-    //   CIN: 3/4"x6" cedar (update to match your Cincinnati supplier)
-    //   Others: default to 5/8"x6" cedar
-    let picketDesc, picketCost, picketSupplier;
-    if(!isCedar){
-      if(t===G){
-        picketDesc     = `5/8"x6"x${hft<=6?6:8}' Dog Ear Picket — Treated Pine`;
-        picketCost     = hft<=4 ? 2.30 : 2.28;
-        picketSupplier = 'The Home Depot';
-      } else {
-        picketDesc     = `3/4"x6"x${hft<=6?6:8}' Dog Ear Picket — Treated Pine`;
-        picketCost     = hft<=4 ? 2.30 : 3.68;
-        picketSupplier = 'The Home Depot';
+    if(isRanch){
+      // ── RANCH RAIL BOM
+      // Fixed 4ft style: 3× 2x6x8 horizontal stringers per section, no pickets
+      // Posts already added above (4x4x6 — correct for 4ft)
+      // 1x4x4 square-top trim board covers each post face
+      add('Stringers', '2x6x8 Horizontal Stringer — Treated Pine', secs * 3, 'EA', 9.50, 'Decks & Docks'); // UPDATE: stringer cost per branch
+      add('Post Trim', '1x4x4 Square Top Trim Board — Treated Pine', totalPosts, 'EA', 3.50, 'Decks & Docks'); // UPDATE: trim cost per branch
+      add('Concrete', 'Concrete 80lb Bag', totalPosts * 2, 'BAG', 5.98, 'The Home Depot');
+      add('Fasteners', 'Nails — subcontractor allowance', 1, 'ALLOW', Math.round(0.25*lf*100)/100, 'Subcontractor');
+      if(state.addons.has('addonRanchMesh:0')){
+        // Galvanized mesh fabric behind stringers — PLACEHOLDER
+        // UPDATE: confirm gauge (typically 14ga or 16ga), supplier, and $/LF
+        add('Mesh', '4ft Galvanized Mesh Fabric — PLACEHOLDER', lf * 1.03, 'LF', 0.00, 'TBD');
       }
-    } else if(isCIN){
-      // Cincinnati cedar pickets — update size and cost to match your supplier
-      picketDesc     = `3/4"x6"x${hft<=6?6:8}' Dog Ear Picket — Cedar`;
-      picketCost     = 8.50;  // UPDATE: enter your Cincinnati cedar picket cost
-      picketSupplier = 'Local Lumber Co';
+
     } else {
-      // VB and all other branches: cedar pickets only
-      picketDesc     = `5/8"x6"x${hft<=6?6:8}' Dog Ear Picket — Cedar`;
-      picketCost     = hft<=4 ? 9.66 : 8.66;
-      picketSupplier = 'Decks & Docks';
-    }
-    add('Pickets', picketDesc, totalPickets, 'EA', picketCost, picketSupplier);
+      // ── PRIVACY FENCE BOM
 
-    // ── CONCRETE: 2 bags per post, 80lb bags
-    // Rule of thumb: one 80lb bag fills ~0.6 cubic ft — adequate for 4x4 posts
-    add('Concrete', 'Concrete 80lb Bag', totalPosts * 2, 'BAG', 5.98, 'The Home Depot');
+      // ── RAILS
+      // Cedar (Best): 2 rails per section, cedar lumber, all branches
+      // PT Pine (Good/Better): 3 rails per section, all branches
+      let railsPerSec, railDesc, railCost, railSupplier;
+      if(isCedar){
+        railsPerSec  = 2;
+        railDesc     = '2x4x8 Rail — Cedar';
+        railCost     = isCIN ? 18.50 : 18.50; // UPDATE per branch: cedar rail cost
+        railSupplier = isCIN ? 'Local Lumber Co' : 'Local Lumber Co';
+      } else {
+        railsPerSec  = 3;
+        railDesc     = '2x4x8 Rail — Treated Pine';
+        railCost     = 5.71; // UPDATE per branch: PT pine rail cost
+        railSupplier = 'Decks & Docks';
+      }
+      add('Rails', railDesc, secs * railsPerSec, 'EA', railCost, railSupplier);
 
-    // ── FASTENERS
-    // 1 box of screws (124ct) covers ~50 linear feet of fence
-    const screwBoxes = Math.ceil(lf / 50);
-    add('Fasteners', 'Wood Screws 1lb/124ct — 1 5/8"', screwBoxes, 'BOX', 10.97, 'The Home Depot');
-    add('Fasteners', 'Nails — subcontractor allowance', 1, 'ALLOW', Math.round(0.25*lf*100)/100, 'Subcontractor');
+      // ── PICKETS
+      // 5/8x6 actual width = 5.5" → 2.18 pickets/ft + 5% waste
+      // Lattice top: field height = fence height − 2ft → use shorter pickets
+      const hasLattice   = state.addons.has('addonLattice:0');
+      const picketLen    = hasLattice ? (hft - 2) : (hft <= 6 ? 6 : 8);
+      const picketsPerFt = (12 / 5.5) * 1.05; // ~2.29/ft
+      const totalPickets = Math.ceil(lf * picketsPerFt);
 
-    // ── ADD-ONS
-    if(state.addons.has('addonTopCap:0')){
-      // Top Cap: 2x6x8 boards, one per section
-      // Fascia: 1x6x16 boards, one per 16ft of run
-      add('Add-On', '2x6x8 Top Cap Board', secs, 'EA', 10.05, 'Decks & Docks');
-      add('Add-On', '1x6x16 Fascia Board', Math.ceil(lf/16), 'EA', 15.04, 'Decks & Docks');
-    }
-    if(state.addons.has('addonLattice:0')){
-      // 2ft lattice section on top — one 4x8 lattice panel per section, cut in half
-      add('Add-On', '4x8 Lattice Panel (cut to 2ft height)', Math.ceil(secs/2), 'EA', 18.00, 'The Home Depot');
-    }
-    if(state.addons.has('addonBob:0')){
-      // Board on Board: alternating pickets overlap ~50% → need ~1.7x pickets total
-      // Extra pickets = 70% more than standard count
-      add('Add-On', 'Extra Pickets for Board on Board (70% more)', Math.ceil(totalPickets*0.70), 'EA', picketCost, picketSupplier);
-    }
-    if(state.addons.has('addonHorizontal:0')){
-      // Horizontal board: 3/4x6 boards run horizontally, same count as pickets
-      add('Add-On', '3/4"x6" Horizontal Boards', Math.ceil(lf * (12/5.5) * 1.05), 'EA', 3.68, 'The Home Depot');
+      let picketDesc, picketCost, picketSupplier;
+      if(!isCedar){
+        if(t===G){
+          picketDesc     = `5/8"x6"x${picketLen}' Dog Ear Picket — Treated Pine`;
+          picketCost     = picketLen<=4 ? 2.30 : 2.28;
+          picketSupplier = 'The Home Depot';
+        } else {
+          picketDesc     = `3/4"x6"x${picketLen}' Dog Ear Picket — Treated Pine`;
+          picketCost     = picketLen<=4 ? 2.30 : 3.68;
+          picketSupplier = 'The Home Depot';
+        }
+      } else if(isCIN){
+        picketDesc     = `3/4"x6"x${picketLen}' Dog Ear Picket — Cedar`;
+        picketCost     = 8.50; // UPDATE: Cincinnati cedar picket cost
+        picketSupplier = 'Local Lumber Co';
+      } else {
+        picketDesc     = `5/8"x6"x${picketLen}' Dog Ear Picket — Cedar`;
+        picketCost     = picketLen<=4 ? 9.66 : 8.66;
+        picketSupplier = 'Decks & Docks';
+      }
+      add('Pickets', picketDesc, totalPickets, 'EA', picketCost, picketSupplier);
+
+      // ── CONCRETE: 2 bags per post, 80lb bags
+      add('Concrete', 'Concrete 80lb Bag', totalPosts * 2, 'BAG', 5.98, 'The Home Depot');
+
+      // ── FASTENERS
+      const screwBoxes = Math.ceil(lf / 50);
+      add('Fasteners', 'Wood Screws 1lb/124ct — 1 5/8"', screwBoxes, 'BOX', 10.97, 'The Home Depot');
+      add('Fasteners', 'Nails — subcontractor allowance', 1, 'ALLOW', Math.round(0.25*lf*100)/100, 'Subcontractor');
+
+      // ── ADD-ONS
+      if(hasLattice){
+        // 4x8 panel split in half → two 2×8ft pieces, one per section
+        add('Add-On', '4x8 Lattice Panel (cut to 2ft height)', Math.ceil(secs/2), 'EA', 18.00, 'The Home Depot');
+      }
+      if(state.addons.has('addonTopCap:0')){
+        add('Add-On', '2x6x8 Top Cap Board', secs, 'EA', 10.05, 'Decks & Docks');
+        add('Add-On', '1x6x16 Fascia Board', Math.ceil(lf/16), 'EA', 15.04, 'Decks & Docks');
+      }
+      if(state.addons.has('addonBob:0')){
+        add('Add-On', 'Extra Pickets for Board on Board (70% more)', Math.ceil(totalPickets*0.70), 'EA', picketCost, picketSupplier);
+      }
+      if(state.addons.has('addonHorizontal:0')){
+        add('Add-On', '3/4"x6" Horizontal Boards', Math.ceil(lf * (12/5.5) * 1.05), 'EA', 3.68, 'The Home Depot');
+      }
     }
 
   } else if(m==='vinyl'){
