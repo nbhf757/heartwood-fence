@@ -1385,7 +1385,7 @@ function toggleGateSegment(pt) {
     const d = pointToSegDist(pt, pts[i], pts[i+1]);
     if (d < closestDist) { closestDist = d; closest = i; }
   }
-  if (closestDist < 18) {
+  if (closestDist < 24) {
     if (drawState.gateSegs.has(closest)) drawState.gateSegs.delete(closest);
     else drawState.gateSegs.add(closest);
   }
@@ -1567,46 +1567,53 @@ function applyDrawing() {
   if (ds.points.length < 2) return;
 
   const allPts = ds.closed ? [...ds.points, ds.points[0]] : ds.points;
+  const n = allPts.length - 1; // number of segments
 
-  // Clear existing segments
   state.segments = [];
   segCounter = 0;
+  let autoWalkGates = 0, autoDblGates = 0;
 
   allPts.slice(0,-1).forEach((a, i) => {
     const b = allPts[i+1];
     const lengthFt = Math.round(Math.hypot(b.x-a.x, b.y-a.y) / ds.scale * 10)/10;
     if (lengthFt < 0.5) return; // skip trivial segments
 
-    segCounter++;
     const isGate = ds.gateSegs.has(i);
 
-    // Determine post types:
-    // In a closed shape every interior vertex is a corner
-    // For open shapes endpoints are terminals
-    const startType = i === 0 && !ds.closed ? 'terminal' : isGate ? 'gate' : 'corner';
-    const endType   = i === allPts.length-2 && !ds.closed ? 'terminal' : isGate ? 'gate' : 'corner';
+    // Gate segments are openings — exclude from fence footage.
+    // Count them so Step 5 can be auto-populated.
+    if (isGate) {
+      if (lengthFt <= 5) autoWalkGates++;
+      else autoDblGates++;
+      return;
+    }
 
-    state.segments.push({
-      id: segCounter,
-      length: lengthFt,
-      start: startType,
-      end:   endType,
-    });
+    // Post type at each vertex depends on whether the adjacent segment is a gate.
+    // Wrap-around handles closed shapes where the last segment neighbors the first.
+    const prevIsGate = ds.gateSegs.has(i - 1) ||
+                       (ds.closed && i === 0 && ds.gateSegs.has(n - 1));
+    const nextIsGate = ds.gateSegs.has(i + 1) ||
+                       (ds.closed && i === n - 1 && ds.gateSegs.has(0));
+
+    const startType = (i === 0   && !ds.closed) ? 'terminal' : prevIsGate ? 'gate' : 'corner';
+    const endType   = (i === n-1 && !ds.closed) ? 'terminal' : nextIsGate ? 'gate' : 'corner';
+
+    segCounter++;
+    state.segments.push({ id: segCounter, length: lengthFt, start: startType, end: endType });
   });
 
-  // Count gates from marked segments and feed gate inputs
-  const gateCount = ds.gateSegs.size;
-  // Simple approach: mark as walk gates (PM can adjust)
-  const gateWalkEl = document.getElementById('gate-walk');
-  if (gateWalkEl && gateCount > 0) gateWalkEl.value = gateCount;
+  // Auto-populate Step 5 gate counts (≤5ft = walk gate, wider = double drive)
+  if (autoWalkGates > 0) document.getElementById('gate-walk').value = autoWalkGates;
+  if (autoDblGates  > 0) document.getElementById('gate-double').value = autoDblGates;
 
-  // Switch back to manual mode to show the populated table
   setInputMode('manual');
   renderSegments();
   recalc();
 
-  // Show confirmation
-  showToast(`✓ Drawing applied — ${state.segments.length} segments, ${Math.round(calcTotalDrawFt())} ft total`);
+  const totalFt = state.segments.reduce((s, seg) => s + (seg.length||0), 0);
+  const gateNote = (autoWalkGates + autoDblGates) > 0
+    ? `, ${autoWalkGates + autoDblGates} gate(s) marked` : '';
+  showToast(`✓ Drawing applied — ${state.segments.length} segments, ${Math.round(totalFt)} ft fence${gateNote}`);
 }
 
 // Init canvas on resize
@@ -1758,6 +1765,7 @@ function buildBOM(){
 
     // ── POSTS (always Treated Pine — cedar posts not used commercially)
     // Post length = fence height + 2ft burial depth, rounded to stock length
+    // Gate posts are always 6x6 and handled separately below — subtract them here.
     const postLen  = hft <= 4 ? 6 : hft <= 6 ? 8 : 12;
     const postUpgSel = parseInt(document.getElementById('sel-post').value)||0;
     const postSize = postUpgSel===2 ? '6x6' : postUpgSel===1 ? '4x6' : '4x4';
@@ -1766,8 +1774,14 @@ function buildBOM(){
       '4x6': postLen===8 ? 24.26 : postLen===10 ? 30.00 : 34.09,
       '6x6': postLen===8 ? 35.21 : postLen===10 ? 45.86 : 52.08,
     };
-    add('Posts', `${postSize}x${postLen} Post — Treated Pine`, totalPosts, 'EA',
-        postCostMap[postSize] || 12.60, 'Decks & Docks');
+    // Gate posts come from gate counts (2 per gate opening).
+    // Subtract them from the general post count so they don't get sized as 4x4.
+    const derivedGatePosts = (gWalk + gDbl + (gCustQ && gCustW ? gCustQ : 0)) * 2;
+    const regularPosts = Math.max(0, totalPosts - derivedGatePosts);
+    if (regularPosts > 0) {
+      add('Posts', `${postSize}x${postLen} Post — Treated Pine`, regularPosts, 'EA',
+          postCostMap[postSize] || 12.60, 'Decks & Docks');
+    }
 
     const isRanch = state.addons.has('addonRanch:0');
 
@@ -1858,6 +1872,44 @@ function buildBOM(){
       }
       if(state.addons.has('addonHorizontal:0')){
         add('Add-On', '3/4"x6" Horizontal Boards', Math.ceil(lf * (12/5.5) * 1.05), 'EA', 3.68, 'The Home Depot');
+      }
+
+      // ── WOOD GATE MATERIALS
+      // Gate posts: always 6x6 PT regardless of line post upgrade selection.
+      // 6x6x8 standard; 6x6x10 when Top Cap add-on is selected (extra height).
+      // Frame: cedar 2x4 Z-frame (top rail, bottom rail, 2 stiles, diagonal brace).
+      // Pickets: same species/size/cost as the fence run.
+      // Hardware: 3 hinges per leaf; latch allowance (branch-specified cost).
+      // Double drive: 6 hinges total (3 per leaf) + cane bolt / drop rod.
+      if (derivedGatePosts > 0) {
+        const hasTopCap   = state.addons.has('addonTopCap:0');
+        const gPostLen    = hasTopCap ? 10 : 8;
+        const gPostCost   = gPostLen === 10 ? 45.86 : 35.21; // 6x6x8 or 6x6x10 PT
+        const cedarFrameCost = 5.50; // UPDATE per branch: cedar 2x4x8 cost
+        add('Gate Posts', `6x6x${gPostLen} Post — Treated Pine`, derivedGatePosts, 'EA', gPostCost, 'Decks & Docks');
+
+        if (gWalk > 0) {
+          const w = 4, frameBoards = Math.ceil((8 + 2*hft + Math.hypot(w, hft)) / 8);
+          add('Gate Frame',    '2x4x8 Frame Board — Cedar',           gWalk * frameBoards, 'EA', cedarFrameCost, 'Local Lumber Co');
+          add('Gate Pickets',  picketDesc,                             gWalk * Math.ceil(w * picketsPerFt), 'EA', picketCost, picketSupplier);
+          add('Gate Hardware', 'Gate Hinge — Heavy Duty',              gWalk * 3,   'EA', 8.50, 'The Home Depot'); // UPDATE
+          add('Gate Hardware', 'Gate Latch — allowance per branch',    gWalk,       'EA', 0.00, 'TBD');
+        }
+        if (gDbl > 0) {
+          const leafW = 5, frameBoards = Math.ceil((8 + 2*hft + Math.hypot(leafW, hft)) / 8) * 2;
+          add('Gate Frame',    '2x4x8 Frame Board — Cedar',           gDbl * frameBoards, 'EA', cedarFrameCost, 'Local Lumber Co');
+          add('Gate Pickets',  picketDesc,                             gDbl * Math.ceil(10 * picketsPerFt), 'EA', picketCost, picketSupplier);
+          add('Gate Hardware', 'Gate Hinge — Heavy Duty',              gDbl * 6,    'EA', 8.50, 'The Home Depot'); // 3 per leaf
+          add('Gate Hardware', 'Gate Latch — allowance per branch',    gDbl,        'EA', 0.00, 'TBD');
+          add('Gate Hardware', 'Cane Bolt / Drop Rod',                 gDbl,        'EA', 12.50, 'The Home Depot'); // UPDATE
+        }
+        if (gCustQ && gCustW) {
+          const frameBoards = Math.ceil((8 + 2*hft + Math.hypot(gCustW, hft)) / 8);
+          add('Gate Frame',    '2x4x8 Frame Board — Cedar',           gCustQ * frameBoards, 'EA', cedarFrameCost, 'Local Lumber Co');
+          add('Gate Pickets',  picketDesc,                             gCustQ * Math.ceil(gCustW * picketsPerFt), 'EA', picketCost, picketSupplier);
+          add('Gate Hardware', 'Gate Hinge — Heavy Duty',              gCustQ * 3,  'EA', 8.50, 'The Home Depot');
+          add('Gate Hardware', 'Gate Latch — allowance per branch',    gCustQ,      'EA', 0.00, 'TBD');
+        }
       }
     }
 
