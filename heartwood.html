@@ -123,17 +123,17 @@
   .tab-icon { width: 56px; height: 40px; }
   .tab-label { line-height: 1; }
 
-  /* ── Tier selector ── */
-  .tier-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 16px; }
+  /* ── Product selector (replaces Good/Better/Best tiers) ── */
+  .tier-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
   .tier-btn {
-    padding: 10px 7px; border: 2px solid var(--border); border-radius: 8px;
-    background: var(--cream); cursor: pointer; transition: all .15s;
+    flex: 1 1 130px; padding: 10px 7px; border: 2px solid var(--border); border-radius: 8px;
+    background: var(--cream); cursor: pointer; transition: all .15s; text-align:left;
   }
   .tier-btn:hover { border-color: var(--green); }
   .tier-btn.active { border-color: var(--green); background: linear-gradient(135deg,#f5ffde,#eef9c0); }
   .tier-grade { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--mid); margin-bottom: 2px; }
   .tier-btn.active .tier-grade { color: var(--green2); }
-  .tier-supplier { font-weight: 700; font-size: 0.82rem; color: var(--navy); margin-bottom: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tier-supplier { font-weight: 700; font-size: 0.82rem; color: var(--navy); margin-bottom: 1px; }
   .tier-desc { font-size: 0.68rem; color: var(--mid); line-height: 1.3; }
 
   /* ── Height pills ── */
@@ -612,10 +612,12 @@
         </button>
       </div>
 
-      <div class="card-title"><div class="step">2</div><span id="tier-title">Wood Grade</span></div>
+      <div class="card-title"><div class="step">2</div><span id="tier-title">Fence Type</span></div>
       <div class="tier-row" id="tier-row"></div>
-      <div class="card-title"><div class="step">3</div> Fence Height</div>
-      <div class="height-row" id="height-row"></div>
+      <div id="height-section">
+        <div class="card-title"><div class="step">3</div> Fence Height</div>
+        <div class="height-row" id="height-row"></div>
+      </div>
     </div>
 
     <!-- Step 4: Segments (dual mode) -->
@@ -874,76 +876,355 @@ const FALLBACK = {
   addonBarb:[0,0,0,1.2],addonSlats:[0,0,0,3.8],addonBlackMesh:[0,0,0,1.5],
 };
 
+// ── Product catalog (branch-specific named products) ────────
+// Each product defines EA costs for BOM recipe + mat_per_lf for quote pricing.
+// mat_per_lf: pre-computed $/lf baseline (VB fallback only). EA-cost products leave it undefined.
+// heights_ft: array of strings like ['6 ft']. Single-height products bypass height modifier.
+// addons.cost_type: 'p_key' = look up P[p_key][p_idx] (VB fallback); 'lf' = $/lf direct;
+//                  'ea' = derive $/lf from unit math; 'kit' = fixed per-gate cost.
+const FALLBACK_PRODUCTS = [
+  // ══ VB WOOD ══════════════════════════════════════════════
+  { branch:'VB', product_id:'vb_wood_privacy_good', product_name:'Privacy — PT Pine (5/8")',
+    material:'wood', style_template:'privacy_picket', section_length_ft:8, heights_ft:['4 ft','6 ft','8 ft'],
+    infill_desc:'Dog Ear Picket — Treated Pine', infill_dim:'5/8"x6"',
+    infill_cost_ea:2.28, infill_cost_ea_short:2.30, infill_supplier:'Decks & Docks',
+    rails_per_section:3, rail_desc:'2x4x8 Rail — Treated Pine', rail_cost_ea:5.71, rail_supplier:'Decks & Docks',
+    post_size:'4x4', post_cost_6ft:8.96, post_cost_8ft:12.60, post_cost_12ft:16.37, post_supplier:'Decks & Docks',
+    gate_post_size:'6x6', gate_post_cost_8ft:35.21, gate_post_cost_10ft:45.86, gate_post_supplier:'Decks & Docks',
+    labor_per_lf:7, mat_per_lf:10.314,
+    addons:[
+      {key:'board_on_board', label:'Board on Board',   cost_type:'p_key',p_key:'addonBob',     p_idx:0},
+      {key:'lattice_top',    label:'Lattice Top',      cost_type:'p_key',p_key:'addonLattice', p_idx:0},
+      {key:'top_cap_fascia', label:'Top Cap & Fascia', cost_type:'p_key',p_key:'addonTopCap',  p_idx:0},
+      {key:'gaps_in_pickets',label:'Gaps in Pickets',  cost_type:'p_key',p_key:'addonGaps',    p_idx:0},
+      {key:'inset_framing',  label:'Inset Framing',    cost_type:'p_key',p_key:'addonInset',   p_idx:0},
+    ],
+  },
+  { branch:'VB', product_id:'vb_wood_privacy_better', product_name:'Privacy — PT Pine (3/4")',
+    material:'wood', style_template:'privacy_picket', section_length_ft:8, heights_ft:['4 ft','6 ft','8 ft'],
+    infill_desc:'Dog Ear Picket — Treated Pine', infill_dim:'3/4"x6"',
+    infill_cost_ea:3.68, infill_cost_ea_short:2.30, infill_supplier:'Decks & Docks',
+    rails_per_section:3, rail_desc:'2x4x8 Rail — Treated Pine', rail_cost_ea:5.71, rail_supplier:'Decks & Docks',
+    post_size:'4x4', post_cost_6ft:8.96, post_cost_8ft:12.60, post_cost_12ft:16.37, post_supplier:'Decks & Docks',
+    gate_post_size:'6x6', gate_post_cost_8ft:35.21, gate_post_cost_10ft:45.86, gate_post_supplier:'Decks & Docks',
+    labor_per_lf:7, mat_per_lf:13.702,
+    addons:[
+      {key:'board_on_board', label:'Board on Board',   cost_type:'p_key',p_key:'addonBob',     p_idx:0},
+      {key:'lattice_top',    label:'Lattice Top',      cost_type:'p_key',p_key:'addonLattice', p_idx:0},
+      {key:'top_cap_fascia', label:'Top Cap & Fascia', cost_type:'p_key',p_key:'addonTopCap',  p_idx:0},
+      {key:'gaps_in_pickets',label:'Gaps in Pickets',  cost_type:'p_key',p_key:'addonGaps',    p_idx:0},
+      {key:'inset_framing',  label:'Inset Framing',    cost_type:'p_key',p_key:'addonInset',   p_idx:0},
+    ],
+  },
+  { branch:'VB', product_id:'vb_wood_privacy_cedar', product_name:'Privacy — Cedar',
+    material:'wood', style_template:'privacy_picket', section_length_ft:8, heights_ft:['4 ft','6 ft','8 ft'],
+    infill_desc:'Dog Ear Picket — Cedar', infill_dim:'5/8"x6"',
+    infill_cost_ea:8.66, infill_cost_ea_short:9.66, infill_supplier:'Decks & Docks',
+    rails_per_section:2, rail_desc:'2x4x8 Rail — Cedar', rail_cost_ea:9.50, rail_supplier:'Decks & Docks',
+    post_size:'4x4', post_cost_6ft:8.96, post_cost_8ft:12.60, post_cost_12ft:16.37, post_supplier:'Decks & Docks',
+    gate_post_size:'6x6', gate_post_cost_8ft:35.21, gate_post_cost_10ft:45.86, gate_post_supplier:'Decks & Docks',
+    labor_per_lf:7, mat_per_lf:13.460,
+    addons:[
+      {key:'board_on_board', label:'Board on Board',   cost_type:'p_key',p_key:'addonBob',     p_idx:0},
+      {key:'lattice_top',    label:'Lattice Top',      cost_type:'p_key',p_key:'addonLattice', p_idx:0},
+      {key:'top_cap_fascia', label:'Top Cap & Fascia', cost_type:'p_key',p_key:'addonTopCap',  p_idx:0},
+      {key:'gaps_in_pickets',label:'Gaps in Pickets',  cost_type:'p_key',p_key:'addonGaps',    p_idx:0},
+      {key:'inset_framing',  label:'Inset Framing',    cost_type:'p_key',p_key:'addonInset',   p_idx:0},
+    ],
+  },
+  // ══ VB VINYL ═════════════════════════════════════════════
+  { branch:'VB', product_id:'vb_vinyl_good', product_name:'Privacy — Standard White',
+    material:'vinyl', style_template:'panel', section_length_ft:8, heights_ft:['4 ft','6 ft','8 ft'],
+    infill_desc:'6H×8L Privacy Panel — White', infill_cost_ea:89.90, infill_supplier:'Homeland/Gallagher',
+    post_size:'5x5 vinyl', post_cost_8ft:20.94, post_supplier:'Mid-Atlantic Fence Supply',
+    labor_per_lf:7, mat_per_lf:14.254,
+    addons:[
+      {key:'lattice_top',  label:'Lattice Top Panel',   cost_type:'p_key',p_key:'addonLattice',  p_idx:1},
+      {key:'spindle_top',  label:'Spindle Top Panel',   cost_type:'p_key',p_key:'addonSpindle',  p_idx:1},
+      {key:'stiffener',    label:'Post Stiffener',      cost_type:'p_key',p_key:'addonStiffener',p_idx:1},
+      {key:'post_cap_dec', label:'Decorative Post Cap', cost_type:'p_key',p_key:'addonPostCap',  p_idx:1},
+      {key:'post_cap_sol', label:'Solar Post Cap',      cost_type:'p_key',p_key:'addonSolar',    p_idx:1},
+      {key:'color_upgrade',label:'Color Upgrade',       cost_type:'p_key',p_key:'addonColor',    p_idx:1},
+    ],
+  },
+  { branch:'VB', product_id:'vb_vinyl_better', product_name:'Privacy — Lattice / Spindle',
+    material:'vinyl', style_template:'panel', section_length_ft:8, heights_ft:['4 ft','6 ft','8 ft'],
+    infill_desc:'6H×8L Lattice/Spindle Panel', infill_cost_ea:110.00, infill_supplier:'Mid-Atlantic',
+    post_size:'5x5 vinyl', post_cost_8ft:20.94, post_supplier:'Mid-Atlantic Fence Supply',
+    labor_per_lf:7, mat_per_lf:18,
+    addons:[
+      {key:'stiffener',    label:'Post Stiffener',      cost_type:'p_key',p_key:'addonStiffener',p_idx:1},
+      {key:'post_cap_dec', label:'Decorative Post Cap', cost_type:'p_key',p_key:'addonPostCap',  p_idx:1},
+      {key:'post_cap_sol', label:'Solar Post Cap',      cost_type:'p_key',p_key:'addonSolar',    p_idx:1},
+      {key:'color_upgrade',label:'Color Upgrade',       cost_type:'p_key',p_key:'addonColor',    p_idx:1},
+    ],
+  },
+  { branch:'VB', product_id:'vb_vinyl_best', product_name:'Privacy — Premium Color/Shadow',
+    material:'vinyl', style_template:'panel', section_length_ft:8, heights_ft:['4 ft','6 ft','8 ft'],
+    infill_desc:'6H×8L Premium Color/Shadowbox Panel', infill_cost_ea:133.31, infill_supplier:'Mid-Atlantic',
+    post_size:'5x5 vinyl', post_cost_8ft:20.94, post_supplier:'Mid-Atlantic Fence Supply',
+    labor_per_lf:8, mat_per_lf:22,
+    addons:[
+      {key:'stiffener',    label:'Post Stiffener',      cost_type:'p_key',p_key:'addonStiffener',p_idx:1},
+      {key:'post_cap_dec', label:'Decorative Post Cap', cost_type:'p_key',p_key:'addonPostCap',  p_idx:1},
+      {key:'post_cap_sol', label:'Solar Post Cap',      cost_type:'p_key',p_key:'addonSolar',    p_idx:1},
+    ],
+  },
+  // ══ VB ALUMINUM ══════════════════════════════════════════
+  { branch:'VB', product_id:'vb_alum_good', product_name:'2-Rail Flush Bottom — 4ft',
+    material:'aluminum', style_template:'panel', section_length_ft:6, heights_ft:['4 ft'],
+    infill_desc:'4ft×6ft 2-Rail Flush Bottom Panel — Black', infill_cost_ea:93.44, infill_supplier:'Patriot Aluminum',
+    post_size:'2x2 aluminum', post_cost_8ft:18.50, post_supplier:'Patriot Aluminum',
+    labor_per_lf:6, mat_per_lf:15.57,
+    addons:[
+      {key:'puppy_picket', label:'Puppy Picket',          cost_type:'p_key',p_key:'addonPuppy',p_idx:2},
+      {key:'spear_top',    label:'Spear Top Upgrade',     cost_type:'p_key',p_key:'addonSpear',p_idx:2},
+      {key:'color_upgrade',label:'Bronze / White Finish', cost_type:'p_key',p_key:'addonColor',p_idx:2},
+    ],
+  },
+  { branch:'VB', product_id:'vb_alum_better', product_name:'3-Rail Thru Bottom — 4.5ft',
+    material:'aluminum', style_template:'panel', section_length_ft:6, heights_ft:['4.5 ft'],
+    infill_desc:'4.5ft×6ft 3-Rail Thru Bottom Panel — Black', infill_cost_ea:101.25, infill_supplier:'Patriot Aluminum',
+    post_size:'2x2 aluminum', post_cost_8ft:18.50, post_supplier:'Patriot Aluminum',
+    labor_per_lf:6, mat_per_lf:16.88,
+    addons:[
+      {key:'puppy_picket', label:'Puppy Picket',          cost_type:'p_key',p_key:'addonPuppy',p_idx:2},
+      {key:'spear_top',    label:'Spear Top Upgrade',     cost_type:'p_key',p_key:'addonSpear',p_idx:2},
+      {key:'color_upgrade',label:'Bronze / White Finish', cost_type:'p_key',p_key:'addonColor',p_idx:2},
+    ],
+  },
+  { branch:'VB', product_id:'vb_alum_best', product_name:'Spear Top / Puppy Picket — 4.5ft',
+    material:'aluminum', style_template:'panel', section_length_ft:6, heights_ft:['4.5 ft'],
+    infill_desc:'4.5ft×6ft Spear Top / Puppy Picket Panel — Black', infill_cost_ea:129.71, infill_supplier:'Patriot Aluminum',
+    post_size:'2x2 aluminum', post_cost_8ft:18.50, post_supplier:'Patriot Aluminum',
+    labor_per_lf:6, mat_per_lf:21.62,
+    addons:[
+      {key:'color_upgrade',label:'Bronze / White Finish', cost_type:'p_key',p_key:'addonColor',p_idx:2},
+    ],
+  },
+  // ══ VB CHAIN LINK ════════════════════════════════════════
+  { branch:'VB', product_id:'vb_cl_good', product_name:'Galvanized 11.5ga',
+    material:'chainlink', style_template:'mesh', section_length_ft:10, heights_ft:['3 ft','4 ft','5 ft','6 ft','8 ft'],
+    infill_desc:'Galvanized 11.5ga Chain Link Mesh', infill_cost_ea:1.85, infill_supplier:'Master Halco',
+    rail_desc:'1 3/8"×21ft Top Rail', rail_cost_ea:16.59, rail_supplier:'Master Halco',
+    post_size:'steel', post_cost_6ft:8.24, post_cost_8ft:11.46, post_supplier:'Master Halco',
+    gate_post_size:'steel', gate_post_cost_8ft:11.46, gate_post_supplier:'Master Halco',
+    labor_per_lf:8, mat_per_lf:3.31,
+    addons:[
+      {key:'barb_wire',       label:'Barbed Wire Top',    cost_type:'p_key',p_key:'addonBarb',      p_idx:3},
+      {key:'privacy_slats',   label:'Privacy Slats',      cost_type:'p_key',p_key:'addonSlats',     p_idx:3},
+      {key:'black_vinyl_mesh',label:'Black Mesh Upgrade', cost_type:'p_key',p_key:'addonBlackMesh', p_idx:3},
+    ],
+  },
+  { branch:'VB', product_id:'vb_cl_better', product_name:'Black PVC 9ga',
+    material:'chainlink', style_template:'mesh', section_length_ft:10, heights_ft:['3 ft','4 ft','5 ft','6 ft','8 ft'],
+    infill_desc:'Black PVC 9ga Chain Link Mesh', infill_cost_ea:1.96, infill_supplier:'Master Halco',
+    rail_desc:'1 3/8"×21ft Top Rail', rail_cost_ea:16.59, rail_supplier:'Master Halco',
+    post_size:'steel', post_cost_6ft:8.24, post_cost_8ft:11.46, post_supplier:'Master Halco',
+    gate_post_size:'steel', gate_post_cost_8ft:11.46, gate_post_supplier:'Master Halco',
+    labor_per_lf:8, mat_per_lf:4.88,
+    addons:[
+      {key:'barb_wire',    label:'Barbed Wire Top', cost_type:'p_key',p_key:'addonBarb', p_idx:3},
+      {key:'privacy_slats',label:'Privacy Slats',   cost_type:'p_key',p_key:'addonSlats',p_idx:3},
+    ],
+  },
+  { branch:'VB', product_id:'vb_cl_best', product_name:'Black PVC Commercial',
+    material:'chainlink', style_template:'mesh', section_length_ft:10, heights_ft:['3 ft','4 ft','5 ft','6 ft','8 ft'],
+    infill_desc:'Black PVC Commercial Chain Link Mesh', infill_cost_ea:2.93, infill_supplier:'Master Halco',
+    rail_desc:'1 3/8"×21ft Top Rail', rail_cost_ea:16.59, rail_supplier:'Master Halco',
+    post_size:'steel', post_cost_6ft:8.24, post_cost_8ft:11.46, post_supplier:'Master Halco',
+    gate_post_size:'steel', gate_post_cost_8ft:11.46, gate_post_supplier:'Master Halco',
+    labor_per_lf:9, mat_per_lf:7.20,
+    addons:[
+      {key:'barb_wire',    label:'Barbed Wire Top', cost_type:'p_key',p_key:'addonBarb', p_idx:3},
+      {key:'privacy_slats',label:'Privacy Slats',   cost_type:'p_key',p_key:'addonSlats',p_idx:3},
+    ],
+  },
+  // ══ CIN WOOD ═════════════════════════════════════════════
+  { branch:'CIN', product_id:'cin_wood_privacy_pt', product_name:'Dog Ear Privacy — PT Pine',
+    material:'wood', style_template:'privacy_picket', section_length_ft:8, heights_ft:['6 ft'],
+    infill_desc:'Dog Ear Picket — Treated Pine', infill_dim:'5/8"x6"',
+    infill_cost_ea:2.20, infill_cost_ea_short:2.20, infill_supplier:'Mills',
+    rails_per_section:3, rail_desc:'2x4x8 Rail — Treated Pine', rail_cost_ea:4.70, rail_supplier:'Mills',
+    post_size:'4x4', post_cost_8ft:11.25, post_supplier:'Mills',
+    gate_post_size:'6x6', gate_post_cost_8ft:25.00, gate_post_cost_10ft:30.00, gate_post_supplier:'Mills',
+    labor_per_lf:8,
+    addons:[
+      {key:'board_on_board', label:'Board on Board',   cost_type:'ea',  cost_value:2.20,  supplier:'Mills'},
+      {key:'lattice_top',    label:'Lattice Top',      cost_type:'ea',  cost_value:25.00, supplier:'Lowes'},
+      {key:'top_cap_fascia', label:'Top Cap & Fascia', cost_type:'ea',  cost_value:10.00, supplier:'Mills'},
+      {key:'gaps_in_pickets',label:'Gaps in Pickets',  cost_type:'ea',  cost_value:0,     supplier:'n/a'},
+    ],
+  },
+  { branch:'CIN', product_id:'cin_wood_privacy_pt_8ft', product_name:'Dog Ear Privacy — PT Pine (8ft)',
+    material:'wood', style_template:'privacy_picket', section_length_ft:8, heights_ft:['8 ft'],
+    infill_desc:'Dog Ear Picket — Treated Pine', infill_dim:'5/8"x6"',
+    infill_cost_ea:3.90, infill_cost_ea_short:3.90, infill_supplier:'Mills',
+    rails_per_section:4, rail_desc:'2x4x8 Rail — Treated Pine', rail_cost_ea:4.70, rail_supplier:'Mills',
+    post_size:'4x6', post_cost_8ft:30.00, post_supplier:'Mills',
+    gate_post_size:'6x6', gate_post_cost_8ft:30.00, gate_post_cost_10ft:35.00, gate_post_supplier:'Mills',
+    labor_per_lf:10,
+    addons:[
+      {key:'board_on_board', label:'Board on Board',   cost_type:'ea',  cost_value:3.90,  supplier:'Mills'},
+      {key:'top_cap_fascia', label:'Top Cap & Fascia', cost_type:'ea',  cost_value:10.00, supplier:'Mills'},
+    ],
+  },
+  { branch:'CIN', product_id:'cin_wood_privacy_cedar', product_name:'Dog Ear Privacy — Cedar',
+    material:'wood', style_template:'privacy_picket', section_length_ft:8, heights_ft:['6 ft'],
+    infill_desc:'Dog Ear Picket — Cedar', infill_dim:'5/8"x6"',
+    infill_cost_ea:4.79, infill_cost_ea_short:4.79, infill_supplier:'SPS',
+    rails_per_section:2, rail_desc:'2x4x8 Rail — Cedar', rail_cost_ea:4.70, rail_supplier:'Mills',
+    post_size:'4x4', post_cost_8ft:11.25, post_supplier:'SPS',
+    gate_post_size:'6x6', gate_post_cost_8ft:25.00, gate_post_supplier:'Mills',
+    labor_per_lf:8,
+    addons:[
+      {key:'board_on_board', label:'Board on Board',   cost_type:'ea',  cost_value:4.79,  supplier:'SPS'},
+      {key:'lattice_top',    label:'Lattice Top',      cost_type:'ea',  cost_value:25.00, supplier:'Lowes'},
+      {key:'top_cap_fascia', label:'Top Cap & Fascia', cost_type:'ea',  cost_value:10.00, supplier:'TBD'},
+    ],
+  },
+  { branch:'CIN', product_id:'cin_wood_horiz_cap', product_name:'Horizontal Privacy with Cap',
+    material:'wood', style_template:'horizontal_board', section_length_ft:8, heights_ft:['6 ft'],
+    infill_desc:'1x6 Horizontal Board', infill_dim:'1x6x8', infill_units_per_section:13,
+    infill_cost_ea:6.58, infill_supplier:'Mills',
+    rail_desc:'Cap Board — top of section', rail_dim:'2x6x8', rails_per_section:1, rail_cost_ea:6.58, rail_supplier:'Mills',
+    post_size:'4x4', post_cost_8ft:11.25, post_supplier:'Mills',
+    gate_post_size:'6x6', gate_post_cost_8ft:25.00, gate_post_supplier:'Mills',
+    labor_per_lf:8,
+    addons:[
+      {key:'board_on_board',label:'Board on Board', cost_type:'ea', cost_value:6.58, supplier:'Mills'},
+    ],
+  },
+  { branch:'CIN', product_id:'cin_wood_ky_3rail', product_name:'Kentucky Board — 3 Rail',
+    material:'wood', style_template:'horizontal_board', section_length_ft:8, heights_ft:['4 ft'],
+    infill_desc:'2x6 Board', infill_dim:'2x6x8', infill_units_per_section:3,
+    infill_cost_ea:5.80, infill_supplier:'Mills',
+    post_size:'4x4', post_cost_6ft:11.25, post_supplier:'Mills',
+    gate_post_size:'4x6', gate_post_cost_8ft:11.25, gate_post_supplier:'Mills',
+    labor_per_lf:8,
+    addons:[
+      {key:'wire_mesh',label:'Wire Mesh', cost_type:'lf', cost_value:2.00, supplier:'Imperial Fence'},
+    ],
+  },
+  { branch:'CIN', product_id:'cin_wood_ky_4rail', product_name:'Kentucky Board — 4 Rail',
+    material:'wood', style_template:'horizontal_board', section_length_ft:8, heights_ft:['4 ft'],
+    infill_desc:'2x6 Board', infill_dim:'2x6x8', infill_units_per_section:4,
+    infill_cost_ea:5.80, infill_supplier:'Mills',
+    post_size:'4x4', post_cost_6ft:11.25, post_supplier:'Mills',
+    gate_post_size:'4x6', gate_post_cost_8ft:11.25, gate_post_supplier:'Mills',
+    labor_per_lf:8,
+    addons:[
+      {key:'wire_mesh',label:'Wire Mesh', cost_type:'lf', cost_value:2.00, supplier:'Imperial Fence'},
+    ],
+  },
+  { branch:'CIN', product_id:'cin_wood_split_3rail', product_name:'Split Rail — 3 Rail',
+    material:'wood', style_template:'split_rail', section_length_ft:11, heights_ft:['4 ft'],
+    infill_desc:'Split Rail', infill_dim:'4"x4"x11\'', infill_units_per_section:3,
+    infill_cost_ea:13.60, infill_supplier:'Mills',
+    post_size:'4x4', post_cost_6ft:11.25, post_supplier:'Mills',
+    gate_post_size:'4x6', gate_post_cost_8ft:11.25, gate_post_supplier:'Mills',
+    labor_per_lf:8,
+    addons:[
+      {key:'wire_mesh',label:'Wire Mesh', cost_type:'lf', cost_value:2.00, supplier:'Imperial Fence'},
+    ],
+  },
+  { branch:'CIN', product_id:'cin_wood_split_2rail', product_name:'Split Rail — 2 Rail',
+    material:'wood', style_template:'split_rail', section_length_ft:11, heights_ft:['4 ft'],
+    infill_desc:'Split Rail', infill_dim:'4"x4"x11\'', infill_units_per_section:2,
+    infill_cost_ea:13.60, infill_supplier:'Mills',
+    post_size:'4x4', post_cost_6ft:11.25, post_supplier:'Mills',
+    gate_post_size:'4x6', gate_post_cost_8ft:11.25, gate_post_supplier:'Mills',
+    labor_per_lf:8,
+    addons:[
+      {key:'wire_mesh',label:'Wire Mesh', cost_type:'lf', cost_value:2.00, supplier:'Imperial Fence'},
+    ],
+  },
+  // ══ CIN VINYL ════════════════════════════════════════════
+  { branch:'CIN', product_id:'cin_vinyl_privacy', product_name:'Vinyl Privacy — 6ft',
+    material:'vinyl', style_template:'panel', section_length_ft:8, heights_ft:['6 ft'],
+    infill_desc:'Privacy Panel — 6ft × 8ft', infill_cost_ea:100.00, infill_supplier:'SPS',
+    post_size:'5x5 vinyl', post_cost_8ft:25.00, post_supplier:'SPS',
+    labor_per_lf:7,
+    addons:[
+      {key:'lattice_top',   label:'Lattice Top Panel', cost_type:'ea',  cost_value:25.00, supplier:'Lowes'},
+      {key:'gate_walk',     label:'Walk Gate',         cost_type:'kit', cost_value:300.00, supplier:'SPS'},
+      {key:'gate_double',   label:'Double Drive Gate', cost_type:'kit', cost_value:600.00, supplier:'SPS'},
+    ],
+  },
+  { branch:'CIN', product_id:'cin_vinyl_ranchrail', product_name:'Vinyl Ranch Rail — 3 Rail',
+    material:'vinyl', style_template:'vinyl_horizontal', section_length_ft:8, heights_ft:['4 ft'],
+    infill_desc:'Vinyl Rail', infill_dim:'1.5"x5.5"x8"', infill_units_per_section:3,
+    infill_cost_ea:15.35, infill_supplier:'Imperial Fence',
+    post_size:'5x5 vinyl', post_cost_6ft:25.00, post_supplier:'Imperial Fence',
+    gate_post_size:'5x5 vinyl', gate_post_cost_8ft:25.00, gate_post_supplier:'Imperial Fence',
+    labor_per_lf:7,
+    addons:[
+      {key:'wire_mesh',  label:'Wire Mesh',         cost_type:'lf',  cost_value:2.00,   supplier:'Imperial Fence'},
+      {key:'gate_walk',  label:'Walk Gate',         cost_type:'kit', cost_value:155.00, supplier:'Imperial Fence'},
+      {key:'gate_double',label:'Double Drive Gate', cost_type:'kit', cost_value:350.00, supplier:'Imperial Fence'},
+    ],
+  },
+  // ══ CIN ALUMINUM ═════════════════════════════════════════
+  { branch:'CIN', product_id:'cin_alum_4ft', product_name:'Aluminum Flat Top — 4ft',
+    material:'aluminum', style_template:'panel', section_length_ft:6, heights_ft:['4 ft'],
+    infill_desc:'Aluminum Panel — 4ft × 6ft', infill_cost_ea:64.00, infill_supplier:'SPS',
+    post_size:'2x2 aluminum', post_cost_6ft:18.00, post_supplier:'SPS',
+    labor_per_lf:5,
+    addons:[
+      {key:'gate_walk',  label:'Walk Gate',         cost_type:'kit', cost_value:195.00, supplier:'SPS'},
+      {key:'gate_double',label:'Double Drive Gate', cost_type:'kit', cost_value:400.00, supplier:'SPS'},
+    ],
+  },
+  { branch:'CIN', product_id:'cin_alum_6ft', product_name:'Aluminum Flat Top — 6ft',
+    material:'aluminum', style_template:'panel', section_length_ft:6, heights_ft:['6 ft'],
+    infill_desc:'Aluminum Panel — 6ft × 6ft', infill_cost_ea:132.35, infill_supplier:'Imperial Fence',
+    post_size:'2x2 aluminum', post_cost_8ft:25.00, post_supplier:'Imperial Fence',
+    labor_per_lf:5,
+    addons:[
+      {key:'gate_walk',  label:'Walk Gate',         cost_type:'kit', cost_value:225.00, supplier:'Imperial Fence'},
+      {key:'gate_double',label:'Double Drive Gate', cost_type:'kit', cost_value:450.00, supplier:'Imperial Fence'},
+    ],
+  },
+  // ══ CIN CHAIN LINK ═══════════════════════════════════════
+  { branch:'CIN', product_id:'cin_chainlink', product_name:'Chain Link — Galvanized',
+    material:'chainlink', style_template:'mesh', section_length_ft:10, heights_ft:['3 ft','4 ft','5 ft','6 ft'],
+    infill_desc:'Galvanized 11.5ga Chain Link Mesh', infill_cost_ea:4.66, infill_supplier:'Master Halco',
+    rail_desc:'1 3/8"×21ft Top Rail', rail_cost_ea:null, rail_supplier:'Master Halco',
+    post_size:'steel', post_cost_6ft:null, post_cost_8ft:null, post_supplier:'Master Halco',
+    labor_per_lf:9, mat_per_lf:4.66,
+    addons:[
+      {key:'barb_wire',        label:'Barbed Wire',        cost_type:'lf',  cost_value:0,      supplier:'TBD'},
+      {key:'privacy_slats',    label:'Privacy Slats',      cost_type:'lf',  cost_value:0,      supplier:'TBD'},
+      {key:'black_vinyl_mesh', label:'Black Vinyl Upgrade',cost_type:'lf',  cost_value:0,      supplier:'Master Halco'},
+      {key:'gate_walk',        label:'Walk Gate',          cost_type:'kit', cost_value:225.00, supplier:'Master Halco'},
+      {key:'gate_double',      label:'Double Drive Gate',  cost_type:'kit', cost_value:500.00, supplier:'Master Halco'},
+    ],
+  },
+];
+
 let P = {...FALLBACK};
+let products = [...FALLBACK_PRODUCTS];
 let loadedFrom = "fallback";
 
 let state = {
-  mat:'wood',tier:'good',height:'6 ft',
+  mat:'wood', productId:'vb_wood_privacy_good', height:'6 ft',
   segments:[],addons:new Set(),
   extras:{demo:false,permit:false,ops:true},
 };
 let segCounter = 0;
 
-// ── Material structural config (labels from P at render time) ──
-const MAT_CONFIG = {
-  wood:{
-    tiers:['good','better','cedar'],
-    heights:['4 ft','6 ft','8 ft'],
-    addons:[
-      {key:'addonLattice',i:0,label:'Lattice Top'},
-      {key:'addonTopCap',i:0,label:'Top Cap & Fascia'},
-      {key:'addonBob',i:0,label:'Board on Board'},
-      {key:'addonGaps',i:0,label:'Gaps in Pickets'},
-      {key:'addonInset',i:0,label:'Inset Framing'},
-      {key:'addonSpindle',i:0,label:'Spindle Top Privacy'},
-      {key:'addonHorizontal',i:0,label:'Horizontal Board'},
-      {key:'addonRanch',i:0,label:'Ranch Rail'},
-      {key:'addonRanchMesh',i:0,label:'Ranch Rail — Add Mesh Fabric'},
-    ],
-  },
-  vinyl:{
-    tiers:['good','better','cedar'],
-    heights:['4 ft','6 ft','8 ft'],
-    addons:[
-      {key:'addonLattice',i:1,label:'Lattice Top Panel'},
-      {key:'addonSpindle',i:1,label:'Spindle Top Panel'},
-      {key:'addonStiffener',i:1,label:'Post Stiffener'},
-      {key:'addonPostCap',i:1,label:'Decorative Post Cap'},
-      {key:'addonSolar',i:1,label:'Solar Post Cap'},
-      {key:'addonColor',i:1,label:'Color Upgrade'},
-    ],
-  },
-  aluminum:{
-    tiers:['good','better','cedar'],
-    heights:['4 ft','4.5 ft','6 ft'],
-    addons:[
-      {key:'addonPuppy',i:2,label:'Puppy Picket'},
-      {key:'addonSpear',i:2,label:'Spear Top Upgrade'},
-      {key:'addonColor',i:2,label:'Bronze / White Finish'},
-    ],
-  },
-  chainlink:{
-    tiers:['good','better','cedar'],
-    heights:['3 ft','4 ft','5 ft','6 ft','8 ft'],
-    addons:[
-      {key:'addonBarb',i:3,label:'Barbed Wire Top'},
-      {key:'addonSlats',i:3,label:'Privacy Slats'},
-      {key:'addonBlackMesh',i:3,label:'Black Mesh Upgrade'},
-    ],
-  },
-};
-
-// ── Tier display names (pulled from P — branch-specific) ───
-function tierDisplayData(mat) {
-  const prefix = mat==='wood'?'wood':mat==='vinyl'?'vinyl':mat==='aluminum'?'alum':'cl';
-  const stars = ['⭐','⭐⭐','⭐⭐⭐'];
-  const grades = ['Good','Better','Best'];
-  return ['good','better','cedar'].map((key,i)=>{
-    const sup = P[prefix+(i===0?'Good':i===1?'Better':'Best')+'Supplier'] || grades[i];
-    const desc= P[prefix+(i===0?'Good':i===1?'Better':'Best')+'Desc']     || '';
-    return {key, stars:stars[i], grade:grades[i], supplier:sup, desc};
-  });
+// ── Product helpers ────────────────────────────────────────
+function getProductsForMat(mat) {
+  const branch = document.getElementById('branch-select')?.value || 'VB';
+  let prods = products.filter(p => p.material === mat && p.branch === branch);
+  if (!prods.length) prods = products.filter(p => p.material === mat && p.branch === 'VB');
+  return prods;
 }
+function getProduct() {
+  return products.find(p => p.product_id === state.productId) ||
+         getProductsForMat(state.mat)[0];
+}
+function getDefaultProduct(mat) { return getProductsForMat(mat)[0]; }
 
 // ── Fetch ──────────────────────────────────────────────────
 async function loadBranch(code) {
@@ -953,19 +1234,25 @@ async function loadBranch(code) {
     const json = await res.json();
     if(json.ok && json.pricing) {
       P = {...FALLBACK,...json.pricing};
-      // parse any addon arrays that came back as strings
       Object.keys(FALLBACK).filter(k=>k.startsWith('addon')).forEach(k=>{
         if(typeof P[k]==='string') P[k]=P[k].split(',').map(x=>parseFloat(x)||0);
       });
+      // Replace branch products with live ones from sheet if present
+      if(json.products && json.products.length) {
+        products = [...FALLBACK_PRODUCTS.filter(p=>p.branch!==code), ...json.products];
+      } else {
+        products = [...FALLBACK_PRODUCTS];
+      }
       loadedFrom='live';
       setStatus('ok','✓ Live pricing loaded');
     } else { throw new Error(json.error||'failed'); }
   } catch(e) {
-    P={...FALLBACK}; loadedFrom='fallback';
+    P={...FALLBACK}; products=[...FALLBACK_PRODUCTS]; loadedFrom='fallback';
     setStatus('err','⚠ Using fallback pricing');
   }
   state.addons.clear();
-  renderTiers(); renderHeights(); renderAddons();
+  state.productId = getDefaultProduct(state.mat)?.product_id || state.productId;
+  renderProducts(); renderHeights(); renderAddons();
   recalc();
 }
 function setStatus(s,t){
@@ -977,50 +1264,58 @@ function setStatus(s,t){
 }
 
 // ── Renders ────────────────────────────────────────────────
-function renderTiers(){
-  const labels={wood:'Wood Grade',vinyl:'Vinyl Grade',aluminum:'Aluminum Grade',chainlink:'Chain Link Grade'};
-  document.getElementById('tier-title').textContent=labels[state.mat];
-  document.getElementById('tier-row').innerHTML=tierDisplayData(state.mat).map(t=>`
-    <div class="tier-btn ${state.tier===t.key?'active':''}" onclick="selectTier('${t.key}')">
-      <div class="tier-grade">${t.stars} ${t.grade}</div>
-      <div class="tier-supplier">${t.supplier}</div>
-      <div class="tier-desc">${t.desc}</div>
+function renderProducts(){
+  const labels={wood:'Fence Type',vinyl:'Fence Type',aluminum:'Fence Type',chainlink:'Fence Type'};
+  document.getElementById('tier-title').textContent=labels[state.mat]||'Fence Type';
+  const prods = getProductsForMat(state.mat);
+  document.getElementById('tier-row').innerHTML = prods.map(p => `
+    <div class="tier-btn ${state.productId===p.product_id?'active':''}" onclick="selectProduct('${p.product_id}')">
+      <div class="tier-grade">${p.material.charAt(0).toUpperCase()+p.material.slice(1)}</div>
+      <div class="tier-supplier">${p.product_name}</div>
+      <div class="tier-desc">${(p.heights_ft||[]).join(' · ')}</div>
     </div>`).join('');
 }
 function renderHeights(){
-  const hs=MAT_CONFIG[state.mat].heights;
-  if(!hs.includes(state.height)) state.height=hs[1]||hs[0];
-  document.getElementById('height-row').innerHTML=hs.map(h=>
+  const prod = getProduct();
+  const hs = prod?.heights_ft || ['6 ft'];
+  if(!hs.includes(state.height)) state.height = hs[0];
+  const heightSection = document.getElementById('height-section');
+  if(heightSection) heightSection.style.display = hs.length <= 1 ? 'none' : '';
+  document.getElementById('height-row').innerHTML = hs.map(h=>
     `<button class="height-btn ${state.height===h?'active':''}" onclick="selectHeight('${h}')">${h}</button>`
   ).join('');
 }
 function renderAddons(){
-  document.getElementById('addon-grid').innerHTML=MAT_CONFIG[state.mat].addons.map(a=>{
-    const k=a.key+':'+a.i;
-    return `<label class="addon-check ${state.addons.has(k)?'selected':''}" onclick="event.preventDefault();toggleAddon('${a.key}',${a.i},this)">
-      <input type="checkbox"><div class="check-box">${state.addons.has(k)?'✓':''}</div>
-      <span>${a.label}</span></label>`;
-  }).join('');
+  const prod = getProduct();
+  const addonList = (prod?.addons||[]).filter(a => a.cost_type !== 'kit');
+  document.getElementById('addon-grid').innerHTML = addonList.map(a =>
+    `<label class="addon-check ${state.addons.has(a.key)?'selected':''}" onclick="event.preventDefault();toggleAddon('${a.key}',this)">
+      <input type="checkbox"><div class="check-box">${state.addons.has(a.key)?'✓':''}</div>
+      <span>${a.label}</span></label>`
+  ).join('');
 }
 
 function selectMat(mat){
-  state.mat=mat; state.tier='good'; state.addons.clear();
+  state.mat=mat;
+  const defProd = getDefaultProduct(mat);
+  state.productId = defProd?.product_id || '';
+  state.addons.clear();
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.mat===mat));
   document.getElementById('post-upg-row').style.display=mat==='wood'?'':'none';
-  renderTiers(); renderHeights(); renderAddons(); recalc();
+  renderProducts(); renderHeights(); renderAddons(); recalc();
 }
-function selectTier(t){
-  state.tier=t;
-  document.querySelectorAll('.tier-btn').forEach((b,i)=>b.classList.toggle('active',['good','better','cedar'][i]===t));
-  recalc();
+function selectProduct(id){
+  state.productId = id;
+  state.addons.clear();
+  document.querySelectorAll('.tier-btn').forEach(b=>b.classList.toggle('active',b.onclick?.toString().includes(`'${id}'`)));
+  renderProducts(); renderHeights(); renderAddons(); recalc();
 }
 function selectHeight(h){
   state.height=h;
   document.querySelectorAll('.height-btn').forEach(b=>b.classList.toggle('active',b.textContent===h));
   recalc();
 }
-function toggleAddon(k,i,el){
-  const key=k+':'+i;
+function toggleAddon(key,el){
   state.addons.has(key)?state.addons.delete(key):state.addons.add(key);
   el.classList.toggle('selected');
   el.querySelector('.check-box').textContent=state.addons.has(key)?'✓':'';
@@ -1067,7 +1362,8 @@ function updateSeg(id,field,val){
 
 // ── Post counting ──────────────────────────────────────────
 function getSecLen(){
-  return {wood:P.woodSecLen,vinyl:P.vinylSecLen,aluminum:P.alumSecLen,chainlink:P.clSecLen}[state.mat]||8;
+  return getProduct()?.section_length_ft ||
+    {wood:P.woodSecLen,vinyl:P.vinylSecLen,aluminum:P.alumSecLen,chainlink:P.clSecLen}[state.mat]||8;
 }
 function countPosts(){
   const sl=getSecLen(); let lf=0,secs=0,corners=0,terminals=0,gatePosts=0;
@@ -1089,30 +1385,49 @@ function hMod(){
   return ({['3 ft']:P.clH3,['4 ft']:P.clH4,['5 ft']:P.clH5,['6 ft']:P.clH6,['8 ft']:P.clH8})[h]||1;
 }
 function cogsRate(lf){ return lf>200?P.cogs200:lf>100?P.cogs100:lf>50?P.cogs50:P.cogsLt50; }
+function computeMatPerLf(prod){
+  const st=prod.style_template, sl=prod.section_length_ft||8;
+  if(st==='privacy_picket'){
+    const pickPerLf=(12/5.5)*1.05;
+    return pickPerLf*(prod.infill_cost_ea||0)+((prod.rails_per_section||3)*(prod.rail_cost_ea||0))/sl;
+  }
+  if(st==='horizontal_board'||st==='split_rail') return ((prod.infill_units_per_section||3)*(prod.infill_cost_ea||0))/sl;
+  if(st==='panel')           return (prod.infill_cost_ea||0)/sl;
+  if(st==='vinyl_horizontal') return ((prod.infill_units_per_section||prod.rails_per_section||3)*(prod.infill_cost_ea||0))/sl;
+  if(st==='mesh')            return prod.infill_cost_ea||0; // mesh is $/lf
+  return 0;
+}
+function addonCostPerLf(a, secLen){
+  if(!a) return 0;
+  if(a.cost_type==='p_key'){ const arr=P[a.p_key]; return Array.isArray(arr)?(arr[a.p_idx]||0):0; }
+  if(a.cost_type==='lf')   return a.cost_value||0;
+  if(a.cost_type==='ea'){
+    if(a.key==='board_on_board')  return (a.cost_value||0)*(12/5.5)*1.05*0.70;
+    if(a.key==='lattice_top')     return (a.cost_value||0)/(2*(secLen||8));
+    if(a.key==='top_cap_fascia')  return (a.cost_value||0)*2/(2*(secLen||8));
+    if(a.key==='gaps_in_pickets') return 0;
+    return (a.cost_value||0)/(secLen||8);
+  }
+  return 0; // kit = gate cost, handled in gateRates()
+}
 function baseRates(){
-  const t=state.tier,m=state.mat,hm=hMod();
-  const G='good',B='better',C='cedar';
-  if(m==='wood'){
-    const mat=(t===G?P.woodMatGood:t===B?P.woodMatBetter:P.woodMatBest)+P.woodFastener;
-    const lab= t===G?P.woodLaborGood:t===B?P.woodLaborBetter:P.woodLaborBest;
-    return {mat:mat*hm,lab:lab*hm};
-  }
-  if(m==='vinyl'){
-    const mat=t===G?P.vinylMatGood:t===B?P.vinylMatBetter:P.vinylMatBest;
-    const lab=t===G?P.vinylLaborGood:t===B?P.vinylLaborBetter:P.vinylLaborBest;
-    return {mat:mat*hm,lab:lab*hm};
-  }
-  if(m==='aluminum'){
-    const mat=t===G?P.alumMatGood:t===B?P.alumMatBetter:P.alumMatBest;
-    const lab=t===G?P.alumLaborGood:t===B?P.alumLaborBetter:P.alumLaborBest;
-    return {mat:mat*hm,lab:lab*hm};
-  }
-  const mat=t===G?P.clMatGood:t===B?P.clMatBetter:P.clMatBest;
-  const lab=t===G?P.clLaborGood:t===B?P.clLaborBetter:P.clLaborBest;
-  return {mat:mat*hm,lab:lab*hm};
+  const prod=getProduct();
+  if(!prod) return {mat:0,lab:0};
+  // Apply height modifier only for mat_per_lf (pre-computed) or multi-height products
+  const useHmod = prod.mat_per_lf!==undefined || (prod.heights_ft||[]).length>1;
+  const hm = useHmod ? hMod() : 1.0;
+  const mat_per_lf = prod.mat_per_lf!==undefined
+    ? prod.mat_per_lf + (prod.material==='wood'?P.woodFastener:0)
+    : computeMatPerLf(prod);
+  return {mat:mat_per_lf*hm, lab:(prod.labor_per_lf||7)*hm};
 }
 function gateRates(){
-  const m=state.mat,c=m==='aluminum'||m==='chainlink';
+  const prod=getProduct(), m=state.mat;
+  if(prod?.addons){
+    const gW=prod.addons.find(a=>a.key==='gate_walk' &&a.cost_type==='kit');
+    const gD=prod.addons.find(a=>a.key==='gate_double'&&a.cost_type==='kit');
+    if(gW||gD) return {walk:gW?.cost_value||0, dbl:gD?.cost_value||0, cust:0};
+  }
   return {walk:m==='wood'?P.gateWalkWood:m==='vinyl'?P.gateWalkVinyl:P.gateWalkAlCl,
           dbl: m==='wood'?P.gateDblWood :m==='vinyl'?P.gateDblVinyl :P.gateDblAlCl,
           cust:m==='wood'?P.gateCustomWood:m==='vinyl'?P.gateCustomVinyl:P.gateCustomAlCl};
@@ -1139,8 +1454,12 @@ function recalc(){
   document.getElementById('quote-empty').classList.add('hidden'); document.getElementById('quote-content').classList.remove('hidden');
 
   const {mat:mPF,lab:lPF}=baseRates();
+  const _prod=getProduct(); const _secLen=getSecLen();
   let addonM=0;
-  state.addons.forEach(k=>{ const[pk,i]=k.split(':'); const a=P[pk]; if(Array.isArray(a)) addonM+=a[+i]||0; });
+  state.addons.forEach(addonKey=>{
+    const addonDef=_prod?.addons?.find(a=>a.key===addonKey);
+    addonM+=addonCostPerLf(addonDef,_secLen);
+  });
   const postUpgPF=state.mat==='wood'?([0,P.postUpg4x6,P.postUpg6x6,P.postUpgPM][pU]||0):0;
   const matTotal=lf*(mPF+addonM+postUpgPF)*(1+P.matMarkup)*(1+P.salesTax);
   const labTotal=Math.max(lf*(lPF+(state.extras.demo?P.demoPerFt:0)),P.laborMin);
@@ -1164,13 +1483,13 @@ function recalc(){
   fill.style.width=Math.min(100,margin/0.5*100)+'%';
   fill.style.background=margin>0.38?'#7eb705':margin>0.33?'#e8a020':'#c0392b';
 
-  const tData=tierDisplayData(state.mat); const td=tData[['good','better','cedar'].indexOf(state.tier)];
+  const _prodName=_prod?.product_name||'';
   const gDesc=[gW&&gW+' walk',gD&&gD+' dbl',(gCQ&&gCW)&&gCQ+'×'+gCW+"' custom"].filter(Boolean).join(', ');
-  const addonLabels=[...state.addons].map(k=>{const[pk,i]=k.split(':');return MAT_CONFIG[state.mat].addons.find(a=>a.key===pk&&a.i===+i)?.label;}).filter(Boolean);
+  const addonLabels=[...state.addons].map(k=>_prod?.addons?.find(a=>a.key===k)?.label).filter(Boolean);
 
   document.getElementById('qty-summary').innerHTML=`
     <div class="qty-row"><span class="qty-label">Linear footage</span><span class="qty-val">${lf} ft</span></div>
-    <div class="qty-row"><span class="qty-label">Material</span><span class="qty-val">${state.mat.charAt(0).toUpperCase()+state.mat.slice(1)} · ${td?.supplier||''} · ${state.height}</span></div>
+    <div class="qty-row"><span class="qty-label">Product</span><span class="qty-val">${state.mat.charAt(0).toUpperCase()+state.mat.slice(1)} · ${_prodName} · ${state.height}</span></div>
     <div class="qty-row"><span class="qty-label">Sections</span><span class="qty-val">${secs} × ${getSecLen()}ft</span></div>
     <div class="qty-row"><span class="qty-label">Total posts</span><span class="qty-val">${totalPosts}</span></div>
     ${gDesc?`<div class="qty-row"><span class="qty-label">Gates</span><span class="qty-val">${gDesc}</span></div>`:''}
@@ -1186,7 +1505,8 @@ function recalc(){
 }
 
 function resetAll(){
-  state={mat:'wood',tier:'good',height:'6 ft',segments:[],addons:new Set(),extras:{demo:false,permit:false,ops:true}};
+  const defId=getDefaultProduct('wood')?.product_id||'vb_wood_privacy_good';
+  state={mat:'wood',productId:defId,height:'6 ft',segments:[],addons:new Set(),extras:{demo:false,permit:false,ops:true}};
   segCounter=0;
   ['gate-walk','gate-double','gate-custom-qty'].forEach(id=>document.getElementById(id).value=0);
   document.getElementById('gate-custom-width').value='';
@@ -1652,13 +1972,12 @@ function openModal(){
   const posts = countPosts();
   const branch = document.getElementById('branch-select').value;
   const branchName = document.getElementById('branch-select').selectedOptions[0].text;
-  const tData = tierDisplayData(state.mat);
-  const td = tData[['good','better','cedar'].indexOf(state.tier)];
+  const _mProd = getProduct();
   const matLabel = state.mat.charAt(0).toUpperCase()+state.mat.slice(1);
 
   document.getElementById('modal-quote-summary').innerHTML = `
     <div class="mqs-row"><span>Branch</span><span class="mqs-val">${branchName}</span></div>
-    <div class="mqs-row"><span>Material</span><span class="mqs-val">${matLabel} · ${td?.supplier||''} · ${state.height}</span></div>
+    <div class="mqs-row"><span>Product</span><span class="mqs-val">${matLabel} · ${_mProd?.product_name||''} · ${state.height}</span></div>
     <div class="mqs-row"><span>Linear footage</span><span class="mqs-val">${posts.lf} ft</span></div>
     <div class="mqs-row"><span>Suggested sell price</span><span class="mqs-val">$${Math.round(_lastCalc.sell).toLocaleString()}</span></div>
     <div class="mqs-row"><span>Floor price (min)</span><span class="mqs-val">$${Math.round(_lastCalc.floor).toLocaleString()}</span></div>`;
@@ -1714,296 +2033,241 @@ function validateModal(){
 function buildBOM(){
   const posts = countPosts();
   const {lf, secs, corners, terminals, gatePosts, linePosts} = posts;
-  const totalTerminal = terminals + gatePosts; // end + gate posts
+  const totalTerminal = terminals + gatePosts;
   const totalPosts    = corners + totalTerminal + linePosts;
-  const m = state.mat, t = state.tier, h = state.height;
-  const G='good', B='better', C='cedar';
-  const hft = parseFloat(h); // numeric fence height
+  const prod = getProduct();
+  const st   = prod?.style_template || 'privacy_picket';
+  const hft  = parseFloat(state.height); // numeric fence height
   const gWalk  = parseInt(document.getElementById('gate-walk').value)||0;
   const gDbl   = parseInt(document.getElementById('gate-double').value)||0;
   const gCustW = parseFloat(document.getElementById('gate-custom-width').value)||0;
   const gCustQ = parseInt(document.getElementById('gate-custom-qty').value)||0;
-  // Panel/section rounding: each segment rounds UP independently.
-  // e.g. a 68ft vinyl run = ceil(68/8) = 9 panels, NOT 8.5
-  // This is handled per-segment in countPosts() via Math.ceil(seg.length/secLen)
   const secLen = getSecLen();
 
   let items = [];
   const add = (cat, desc, qty, unit, unitCost, supplier='') =>
     items.push({category:cat, description:desc, qty:Math.ceil(qty), unit, unitCost:unitCost||0, supplier});
 
-  if(m==='wood'){
-    // ─────────────────────────────────────────────────────────────
-    //  WOOD BOM RECIPE
-    //  To change sizing or costs: edit the values below.
-    //  Branch-specific cedar rules are handled by the branch variable.
-    //
-    //  POST SIZING LOGIC:
-    //    4ft fence → 4x4x6 post (4ft fence height + ~2ft in ground)
-    //    6ft fence → 4x4x8 post (6ft fence height + ~2ft in ground)
-    //    8ft fence → 4x6x12 post (heavier post for tall fence)
-    //    Posts are ALWAYS Treated Pine regardless of fence material tier.
-    //    Cedar fences do NOT use cedar posts (too expensive, PT pine is standard).
-    //
-    //  RAIL LOGIC:
-    //    Cedar (Best tier): always 2 rails — cedar lumber, all branches
-    //    PT Pine (Good/Better): always 3 rails — regardless of height
-    //    CIN cedar uses Local Lumber Co; all others source cedar locally
-    //    Rail lumber: 2x4x8 (one per section, 8ft between posts)
-    //
-    //  PICKET LOGIC:
-    //    Good  (5/8x6): actual width 5.5" → 2.18 pickets/ft + 5% waste
-    //    Better(3/4x6): actual width 5.5" → same count, heavier picket
-    //    Best  (Cedar): cedar pickets at all branches
-    //
-    //  CONCRETE: 2 bags (80lb) per post — standard for 4x4 posts in soil
-    // ─────────────────────────────────────────────────────────────
+  // ── Shared helper: wood gate materials (Z-frame cedar, pickets, hardware) ──
+  function addWoodGates(picketDesc, picketCost, picketSup, derivedGatePosts, gPostCost, gPostSup, gPostLabel){
+    if(derivedGatePosts>0) add('Gate Posts', gPostLabel, derivedGatePosts, 'EA', gPostCost, gPostSup);
+    const cedarFrm=5.50, pickPerFt=(12/5.5)*1.05;
+    if(gWalk>0){
+      const fb=Math.ceil((8+2*hft+Math.hypot(4,hft))/8);
+      add('Gate Frame','2x4x8 Frame Board — Cedar',gWalk*fb,'EA',cedarFrm,'Local Lumber Co');
+      add('Gate Pickets',picketDesc,gWalk*Math.ceil(4*pickPerFt),'EA',picketCost,picketSup);
+      add('Gate Hardware','Gate Hinge — Heavy Duty',gWalk*3,'EA',8.50,'The Home Depot');
+      add('Gate Hardware','Gate Latch — allowance',gWalk,'EA',0,'TBD');
+    }
+    if(gDbl>0){
+      const fb=Math.ceil((8+2*hft+Math.hypot(5,hft))/8)*2;
+      add('Gate Frame','2x4x8 Frame Board — Cedar',gDbl*fb,'EA',cedarFrm,'Local Lumber Co');
+      add('Gate Pickets',picketDesc,gDbl*Math.ceil(10*pickPerFt),'EA',picketCost,picketSup);
+      add('Gate Hardware','Gate Hinge — Heavy Duty',gDbl*6,'EA',8.50,'The Home Depot');
+      add('Gate Hardware','Gate Latch — allowance',gDbl,'EA',0,'TBD');
+      add('Gate Hardware','Cane Bolt / Drop Rod',gDbl,'EA',12.50,'The Home Depot');
+    }
+    if(gCustQ&&gCustW){
+      const fb=Math.ceil((8+2*hft+Math.hypot(gCustW,hft))/8);
+      add('Gate Frame','2x4x8 Frame Board — Cedar',gCustQ*fb,'EA',cedarFrm,'Local Lumber Co');
+      add('Gate Pickets',picketDesc,gCustQ*Math.ceil(gCustW*pickPerFt),'EA',picketCost,picketSup);
+      add('Gate Hardware','Gate Hinge — Heavy Duty',gCustQ*3,'EA',8.50,'The Home Depot');
+      add('Gate Hardware','Gate Latch — allowance',gCustQ,'EA',0,'TBD');
+    }
+  }
 
-    const branch = document.getElementById('branch-select').value;
-    const isCedar = (t === C);
-    const isCIN   = (branch === 'CIN');
-
-    // ── POSTS (always Treated Pine — cedar posts not used commercially)
-    // Post length = fence height + 2ft burial depth, rounded to stock length
-    // Gate posts are always 6x6 and handled separately below — subtract them here.
-    const postLen  = hft <= 4 ? 6 : hft <= 6 ? 8 : 12;
+  // ══ STYLE: privacy_picket ═════════════════════════════════
+  if(st==='privacy_picket'){
+    const pCostFull  = prod.infill_cost_ea||2.28;
+    const pCostShort = prod.infill_cost_ea_short||pCostFull;
+    const pSup       = prod.infill_supplier||'Local';
+    const pDim       = prod.infill_dim||'5/8"x6"';
+    const hasLattice = state.addons.has('lattice_top');
+    const picketLen  = hasLattice ? Math.max(hft-2,4) : hft;
+    const pCost      = hasLattice ? pCostShort : pCostFull;
+    const pDesc      = `${pDim}x${picketLen}' ${prod.infill_desc||'Dog Ear Picket'}`;
+    const pickPerFt  = (12/5.5)*1.05;
+    const totalPick  = Math.ceil(lf*pickPerFt);
     const postUpgSel = parseInt(document.getElementById('sel-post').value)||0;
-    const postSize = postUpgSel===2 ? '6x6' : postUpgSel===1 ? '4x6' : '4x4';
-    const postCostMap = {
-      '4x4': postLen===6 ? 8.96 : postLen===8 ? 12.60 : 16.37,
-      '4x6': postLen===8 ? 24.26 : postLen===10 ? 30.00 : 34.09,
-      '6x6': postLen===8 ? 35.21 : postLen===10 ? 45.86 : 52.08,
+
+    // Rails
+    const railsPer = prod.rails_per_section||3;
+    if(prod.rail_cost_ea) add('Rails',prod.rail_desc||'2x4x8 Rail',secs*railsPer,'EA',prod.rail_cost_ea,prod.rail_supplier||'Local');
+
+    // Pickets
+    add('Pickets',pDesc,totalPick,'EA',pCost,pSup);
+
+    // Line posts — respect post upgrade selector (wood only)
+    const pSize = postUpgSel===2?'6x6':postUpgSel===1?'4x6':(prod.post_size||'4x4');
+    const pLen  = hft<=4?6:hft<=6?8:12;
+    const pCostMap = {
+      '4x4': pLen===6?8.96:pLen===8?12.60:16.37,
+      '4x6': pLen===8?24.26:pLen===10?30.00:34.09,
+      '6x6': pLen===8?(prod.post_cost_8ft||35.21):pLen===10?(prod.gate_post_cost_10ft||45.86):52.08,
     };
-    // Gate posts come from gate counts (2 per gate opening).
-    // Subtract them from the general post count so they don't get sized as 4x4.
-    const derivedGatePosts = (gWalk + gDbl + (gCustQ && gCustW ? gCustQ : 0)) * 2;
-    const regularPosts = Math.max(0, totalPosts - derivedGatePosts);
-    if (regularPosts > 0) {
-      add('Posts', `${postSize}x${postLen} Post — Treated Pine`, regularPosts, 'EA',
-          postCostMap[postSize] || 12.60, 'Decks & Docks');
+    const linPostCost = pCostMap[pSize] || (hft<=4?(prod.post_cost_6ft||8.96):(prod.post_cost_8ft||12.60));
+    const derivedGP = (gWalk+gDbl+(gCustQ&&gCustW?gCustQ:0))*2;
+    const regPosts  = Math.max(0, totalPosts-derivedGP);
+    if(regPosts>0) add('Posts',`${pSize}x${pLen} Post — Treated Pine`,regPosts,'EA',linPostCost,prod.post_supplier||'Decks & Docks');
+    add('Concrete','Concrete 80lb Bag',totalPosts*2,'BAG',5.98,'The Home Depot');
+    const screwBoxes=Math.ceil(lf/50);
+    add('Fasteners','Wood Screws 1lb/124ct — 1 5/8"',screwBoxes,'BOX',10.97,'The Home Depot');
+    add('Fasteners','Nails — subcontractor allowance',1,'ALLOW',Math.round(0.25*lf*100)/100,'Subcontractor');
+
+    // Add-ons
+    if(hasLattice){
+      const la=prod.addons?.find(a=>a.key==='lattice_top');
+      add('Add-On','4x8 Lattice Panel (cut to 2ft height)',Math.ceil(secs/2),'EA',la?.cost_value||18,la?.supplier||'The Home Depot');
+    }
+    if(state.addons.has('top_cap_fascia')){
+      const ta=prod.addons?.find(a=>a.key==='top_cap_fascia');
+      const bc=ta?.cost_value||10; const bs=ta?.supplier||'Local';
+      add('Add-On','1x4x16 Top Cap Board',Math.ceil(secs/2),'EA',bc,bs);
+      add('Add-On','1x4x16 Fascia Board', Math.ceil(secs/2),'EA',bc,bs);
+    }
+    if(state.addons.has('board_on_board')){
+      const ba=prod.addons?.find(a=>a.key==='board_on_board');
+      add('Add-On','Extra Pickets for Board on Board (70%)',Math.ceil(totalPick*0.70),'EA',ba?.cost_value||pCostFull,pSup);
     }
 
-    const isRanch = state.addons.has('addonRanch:0');
-
-    if(isRanch){
-      // ── RANCH RAIL BOM
-      // Fixed 4ft style: 3× 2x6x8 horizontal stringers per section, no pickets
-      // Posts already added above (4x4x6 — correct for 4ft)
-      // 1x4x4 square-top trim board covers each post face
-      add('Stringers', '2x6x8 Horizontal Stringer — Treated Pine', secs * 3, 'EA', 9.50, 'Decks & Docks'); // UPDATE: stringer cost per branch
-      add('Post Trim', '1x4x4 Square Top Trim Board — Treated Pine', totalPosts, 'EA', 3.50, 'Decks & Docks'); // UPDATE: trim cost per branch
-      add('Concrete', 'Concrete 80lb Bag', totalPosts * 2, 'BAG', 5.98, 'The Home Depot');
-      add('Fasteners', 'Nails — subcontractor allowance', 1, 'ALLOW', Math.round(0.25*lf*100)/100, 'Subcontractor');
-      if(state.addons.has('addonRanchMesh:0')){
-        // Galvanized mesh fabric behind stringers — PLACEHOLDER
-        // UPDATE: confirm gauge (typically 14ga or 16ga), supplier, and $/LF
-        add('Mesh', '4ft Galvanized Mesh Fabric — PLACEHOLDER', lf * 1.03, 'LF', 0.00, 'TBD');
-      }
-
-    } else {
-      // ── PRIVACY FENCE BOM
-
-      // ── RAILS
-      // Cedar (Best): 2 rails per section, cedar lumber, all branches
-      // PT Pine (Good/Better): 3 rails per section, all branches
-      let railsPerSec, railDesc, railCost, railSupplier;
-      if(isCedar){
-        railsPerSec  = 2;
-        railDesc     = '2x4x8 Rail — Cedar';
-        railCost     = isCIN ? 18.50 : 18.50; // UPDATE per branch: cedar rail cost
-        railSupplier = isCIN ? 'Local Lumber Co' : 'Local Lumber Co';
-      } else {
-        railsPerSec  = 3;
-        railDesc     = '2x4x8 Rail — Treated Pine';
-        railCost     = 5.71; // UPDATE per branch: PT pine rail cost
-        railSupplier = 'Decks & Docks';
-      }
-      add('Rails', railDesc, secs * railsPerSec, 'EA', railCost, railSupplier);
-
-      // ── PICKETS
-      // 5/8x6 actual width = 5.5" → 2.18 pickets/ft + 5% waste
-      // Lattice top: field height = fence height − 2ft → use shorter pickets
-      const hasLattice   = state.addons.has('addonLattice:0');
-      const picketLen    = hasLattice ? (hft - 2) : (hft <= 6 ? 6 : 8);
-      const picketsPerFt = (12 / 5.5) * 1.05; // ~2.29/ft
-      const totalPickets = Math.ceil(lf * picketsPerFt);
-
-      let picketDesc, picketCost, picketSupplier;
-      if(!isCedar){
-        if(t===G){
-          picketDesc     = `5/8"x6"x${picketLen}' Dog Ear Picket — Treated Pine`;
-          picketCost     = picketLen<=4 ? 2.30 : 2.28;
-          picketSupplier = 'The Home Depot';
-        } else {
-          picketDesc     = `3/4"x6"x${picketLen}' Dog Ear Picket — Treated Pine`;
-          picketCost     = picketLen<=4 ? 2.30 : 3.68;
-          picketSupplier = 'The Home Depot';
-        }
-      } else if(isCIN){
-        picketDesc     = `3/4"x6"x${picketLen}' Dog Ear Picket — Cedar`;
-        picketCost     = 8.50; // UPDATE: Cincinnati cedar picket cost
-        picketSupplier = 'Local Lumber Co';
-      } else {
-        picketDesc     = `5/8"x6"x${picketLen}' Dog Ear Picket — Cedar`;
-        picketCost     = picketLen<=4 ? 9.66 : 8.66;
-        picketSupplier = 'Decks & Docks';
-      }
-      add('Pickets', picketDesc, totalPickets, 'EA', picketCost, picketSupplier);
-
-      // ── CONCRETE: 2 bags per post, 80lb bags
-      add('Concrete', 'Concrete 80lb Bag', totalPosts * 2, 'BAG', 5.98, 'The Home Depot');
-
-      // ── FASTENERS
-      const screwBoxes = Math.ceil(lf / 50);
-      add('Fasteners', 'Wood Screws 1lb/124ct — 1 5/8"', screwBoxes, 'BOX', 10.97, 'The Home Depot');
-      add('Fasteners', 'Nails — subcontractor allowance', 1, 'ALLOW', Math.round(0.25*lf*100)/100, 'Subcontractor');
-
-      // ── ADD-ONS
-      if(hasLattice){
-        // 4x8 panel split in half → two 2×8ft pieces, one per section
-        add('Add-On', '4x8 Lattice Panel (cut to 2ft height)', Math.ceil(secs/2), 'EA', 18.00, 'The Home Depot');
-      }
-      if(state.addons.has('addonTopCap:0')){
-        add('Add-On', '2x6x8 Top Cap Board', secs, 'EA', 10.05, 'Decks & Docks');
-        add('Add-On', '1x6x16 Fascia Board', Math.ceil(lf/16), 'EA', 15.04, 'Decks & Docks');
-      }
-      if(state.addons.has('addonBob:0')){
-        add('Add-On', 'Extra Pickets for Board on Board (70% more)', Math.ceil(totalPickets*0.70), 'EA', picketCost, picketSupplier);
-      }
-      if(state.addons.has('addonHorizontal:0')){
-        add('Add-On', '3/4"x6" Horizontal Boards', Math.ceil(lf * (12/5.5) * 1.05), 'EA', 3.68, 'The Home Depot');
-      }
-
-      // ── WOOD GATE MATERIALS
-      // Gate posts: always 6x6 PT regardless of line post upgrade selection.
-      // 6x6x8 standard; 6x6x10 when Top Cap add-on is selected (extra height).
-      // Frame: cedar 2x4 Z-frame (top rail, bottom rail, 2 stiles, diagonal brace).
-      // Pickets: same species/size/cost as the fence run.
-      // Hardware: 3 hinges per leaf; latch allowance (branch-specified cost).
-      // Double drive: 6 hinges total (3 per leaf) + cane bolt / drop rod.
-      if (derivedGatePosts > 0) {
-        const hasTopCap   = state.addons.has('addonTopCap:0');
-        const gPostLen    = hasTopCap ? 10 : 8;
-        const gPostCost   = gPostLen === 10 ? 45.86 : 35.21; // 6x6x8 or 6x6x10 PT
-        const cedarFrameCost = 5.50; // UPDATE per branch: cedar 2x4x8 cost
-        add('Gate Posts', `6x6x${gPostLen} Post — Treated Pine`, derivedGatePosts, 'EA', gPostCost, 'Decks & Docks');
-
-        if (gWalk > 0) {
-          const w = 4, frameBoards = Math.ceil((8 + 2*hft + Math.hypot(w, hft)) / 8);
-          add('Gate Frame',    '2x4x8 Frame Board — Cedar',           gWalk * frameBoards, 'EA', cedarFrameCost, 'Local Lumber Co');
-          add('Gate Pickets',  picketDesc,                             gWalk * Math.ceil(w * picketsPerFt), 'EA', picketCost, picketSupplier);
-          add('Gate Hardware', 'Gate Hinge — Heavy Duty',              gWalk * 3,   'EA', 8.50, 'The Home Depot'); // UPDATE
-          add('Gate Hardware', 'Gate Latch — allowance per branch',    gWalk,       'EA', 0.00, 'TBD');
-        }
-        if (gDbl > 0) {
-          const leafW = 5, frameBoards = Math.ceil((8 + 2*hft + Math.hypot(leafW, hft)) / 8) * 2;
-          add('Gate Frame',    '2x4x8 Frame Board — Cedar',           gDbl * frameBoards, 'EA', cedarFrameCost, 'Local Lumber Co');
-          add('Gate Pickets',  picketDesc,                             gDbl * Math.ceil(10 * picketsPerFt), 'EA', picketCost, picketSupplier);
-          add('Gate Hardware', 'Gate Hinge — Heavy Duty',              gDbl * 6,    'EA', 8.50, 'The Home Depot'); // 3 per leaf
-          add('Gate Hardware', 'Gate Latch — allowance per branch',    gDbl,        'EA', 0.00, 'TBD');
-          add('Gate Hardware', 'Cane Bolt / Drop Rod',                 gDbl,        'EA', 12.50, 'The Home Depot'); // UPDATE
-        }
-        if (gCustQ && gCustW) {
-          const frameBoards = Math.ceil((8 + 2*hft + Math.hypot(gCustW, hft)) / 8);
-          add('Gate Frame',    '2x4x8 Frame Board — Cedar',           gCustQ * frameBoards, 'EA', cedarFrameCost, 'Local Lumber Co');
-          add('Gate Pickets',  picketDesc,                             gCustQ * Math.ceil(gCustW * picketsPerFt), 'EA', picketCost, picketSupplier);
-          add('Gate Hardware', 'Gate Hinge — Heavy Duty',              gCustQ * 3,  'EA', 8.50, 'The Home Depot');
-          add('Gate Hardware', 'Gate Latch — allowance per branch',    gCustQ,      'EA', 0.00, 'TBD');
-        }
-      }
+    // Wood gate materials
+    if(derivedGP>0){
+      const hasTC=state.addons.has('top_cap_fascia');
+      const gPLen=hasTC?10:8;
+      const gPCost=hasTC?(prod.gate_post_cost_10ft||45.86):(prod.gate_post_cost_8ft||35.21);
+      const gPSup=prod.gate_post_supplier||prod.post_supplier||'Decks & Docks';
+      addWoodGates(pDesc,pCostFull,pSup,derivedGP,gPCost,gPSup,`${prod.gate_post_size||'6x6'}x${gPLen} Gate Post — Treated Pine`);
     }
 
-  } else if(m==='vinyl'){
-    // ── PANELS
-    const panelDesc = t===G ? '6H×8L Privacy Panel — White' : t===B ? '6H×8L Lattice/Spindle Panel — White' : '6H×8L Premium Panel';
-    const panelCost = t===G ? 89.90 : t===B ? 110.00 : 133.31;
-    add('Panels', panelDesc, secs, 'EA', panelCost, t===G?'Homeland/Gallagher':'Mid-Atlantic');
-
-    // ── POSTS: end/terminal posts + corner posts + line posts
-    const postLen = hft<=6 ? 108 : 132; // inches
-    add('Posts', `${postLen}" Line Post — 5x5 Vinyl`, linePosts, 'EA', 20.94, 'Mid-Atlantic Fence Supply');
-    add('Posts', `${postLen}" End/Terminal Post — 5x5 Vinyl`, totalTerminal, 'EA', 20.94, 'Mid-Atlantic Fence Supply');
-    add('Posts', `${postLen}" Corner Post — 5x5 Vinyl`, corners, 'EA', 20.94, 'Mid-Atlantic Fence Supply');
-
-    // ── POST CAPS
-    add('Hardware', '5x5 Post Cap — Pyramid (Standard)', totalPosts, 'EA', 1.86, 'Mid-Atlantic Fence Supply');
-
-    // ── GATES
-    if(gWalk)  add('Gates', `${hft<=6?6:8}H×4L Gate — Privacy Vinyl`, gWalk, 'EA', 239.00, 'Mid-Atlantic Fence Supply');
-    if(gDbl)   add('Gates', `${hft<=6?6:8}H×Double Drive Gate — Privacy Vinyl`, gDbl, 'EA', 480.00, 'Mid-Atlantic Fence Supply');
-    if(gCustQ&&gCustW) add('Gates', `Custom ${gCustW}ft Gate — Vinyl`, gCustQ, 'EA', gCustW*P.gateCustomVinyl);
-
-    // ── CONCRETE ANCHORS (surface mount posts skip concrete)
-    const digType = parseInt(document.getElementById('sel-dig').value)||0;
-    if(digType===0||digType===1){
-      add('Concrete', 'Concrete 80lb Bag', totalPosts*2, 'BAG', 5.98, 'The Home Depot');
-    } else {
-      add('Hardware', '3/8"×3 3/4" Concrete Wedge Anchor', totalPosts*4, 'EA', 0.83, 'The Home Depot');
+  // ══ STYLE: horizontal_board ══════════════════════════════
+  } else if(st==='horizontal_board'){
+    const bPerSec = prod.infill_units_per_section||3;
+    add('Boards',prod.infill_desc||'Horizontal Board',secs*bPerSec,'EA',prod.infill_cost_ea||5.80,prod.infill_supplier||'Local');
+    // Cap board (if separate rail_desc and cost listed)
+    if(prod.rail_desc&&prod.rail_cost_ea&&(prod.rails_per_section||0)>0){
+      add('Cap Board',prod.rail_desc,secs*(prod.rails_per_section||1),'EA',prod.rail_cost_ea,prod.rail_supplier||'Local');
     }
-    add('Hardware', 'Fasteners Kit (per project)', 1, 'KIT', 50.00, 'The Home Depot');
+    const pCst = hft<=4?(prod.post_cost_6ft||11.25):(prod.post_cost_8ft||12.60);
+    const derivedGP=(gWalk+gDbl+(gCustQ&&gCustW?gCustQ:0))*2;
+    const regPosts=Math.max(0,totalPosts-derivedGP);
+    if(regPosts>0) add('Posts',`${prod.post_size||'4x4'}x${hft<=4?6:8} Post`,regPosts,'EA',pCst,prod.post_supplier||'Local');
+    add('Concrete','Concrete 80lb Bag',totalPosts*2,'BAG',5.98,'The Home Depot');
+    add('Fasteners','Nails / Screws — allowance',1,'ALLOW',Math.round(0.25*lf*100)/100,'Subcontractor');
+    if(state.addons.has('wire_mesh')){
+      const ma=prod.addons?.find(a=>a.key==='wire_mesh');
+      add('Add-On','Galvanized Wire Mesh',lf,'LF',ma?.cost_value||2.00,ma?.supplier||'Imperial Fence');
+    }
+    if(state.addons.has('board_on_board')){
+      const ba=prod.addons?.find(a=>a.key==='board_on_board');
+      if(ba) add('Add-On','Extra Boards for Board on Board',secs,'EA',ba.cost_value,ba.supplier||'Local');
+    }
+    if(derivedGP>0){
+      const gPC=prod.gate_post_cost_8ft||prod.post_cost_6ft||11.25;
+      const gPS=prod.gate_post_supplier||prod.post_supplier||'Local';
+      add('Gate Posts',`${prod.gate_post_size||'4x6'}x6 Gate Post`,derivedGP,'EA',gPC,gPS);
+      const gr=gateRates();
+      if(gWalk) add('Gates',`Walk Gate — ${prod.product_name}`,gWalk,'EA',gr.walk,gPS);
+      if(gDbl)  add('Gates',`Double Drive Gate — ${prod.product_name}`,gDbl,'EA',gr.dbl,gPS);
+    }
 
-  } else if(m==='aluminum'){
-    // ── PANELS (6ft sections for aluminum)
-    const panelDesc = t===G ? '4ft×6ft 2-Rail Flush Bottom Aluminum Panel — Black' :
-                      t===B ? '4.5ft×6ft 3-Rail Thru Bottom Aluminum Panel — Black' :
-                              '4.5ft×6ft Spear Top / Puppy Picket Panel — Black';
-    const panelCost = t===G ? 93.44 : t===B ? 101.25 : 129.71;
-    add('Panels', panelDesc, secs, 'EA', panelCost, 'Patriot Aluminum');
+  // ══ STYLE: split_rail ════════════════════════════════════
+  } else if(st==='split_rail'){
+    const rPerSec=prod.infill_units_per_section||3;
+    add('Rails',prod.infill_desc||'Split Rail',secs*rPerSec,'EA',prod.infill_cost_ea||13.60,prod.infill_supplier||'Mills');
+    const pCst=prod.post_cost_6ft||11.25;
+    const derivedGP=(gWalk+gDbl+(gCustQ&&gCustW?gCustQ:0))*2;
+    const regPosts=Math.max(0,totalPosts-derivedGP);
+    if(regPosts>0) add('Posts',`${prod.post_size||'4x4'}x6 Post — Mortise`,regPosts,'EA',pCst,prod.post_supplier||'Mills');
+    add('Concrete','Concrete 80lb Bag',totalPosts*2,'BAG',5.98,'The Home Depot');
+    add('Fasteners','Hardware allowance',1,'ALLOW',Math.round(0.25*lf*100)/100,'Subcontractor');
+    if(state.addons.has('wire_mesh')){
+      const ma=prod.addons?.find(a=>a.key==='wire_mesh');
+      add('Add-On','Galvanized Wire Mesh',lf,'LF',ma?.cost_value||2.00,ma?.supplier||'Imperial Fence');
+    }
+    if(derivedGP>0){
+      const gPC=prod.gate_post_cost_8ft||pCst;
+      const gPS=prod.gate_post_supplier||prod.post_supplier||'Mills';
+      add('Gate Posts',`${prod.gate_post_size||'4x6'}x6 Gate Post`,derivedGP,'EA',gPC,gPS);
+      const gr=gateRates();
+      if(gWalk) add('Gates','Walk Gate — Split Rail',gWalk,'EA',gr.walk,gPS);
+      if(gDbl)  add('Gates','Double Drive Gate — Split Rail',gDbl,'EA',gr.dbl,gPS);
+    }
 
-    // ── POSTS (2"×2" square aluminum)
-    add('Posts', '2"×2" Line Post — Black Aluminum', linePosts, 'EA', 18.50, 'Patriot Aluminum');
-    add('Posts', '2"×2" End/Terminal Post — Black Aluminum', totalTerminal, 'EA', 18.50, 'Patriot Aluminum');
-    add('Posts', '2"×2" Corner Post — Black Aluminum', corners, 'EA', 18.50, 'Patriot Aluminum');
+  // ══ STYLE: panel (vinyl or aluminum) ════════════════════
+  } else if(st==='panel'){
+    add('Panels',prod.infill_desc||'Panel',secs,'EA',prod.infill_cost_ea||0,prod.infill_supplier||'Local');
+    const pCst = hft<=4?(prod.post_cost_6ft||prod.post_cost_8ft||20.94):(prod.post_cost_8ft||prod.post_cost_6ft||20.94);
+    const pSup = prod.post_supplier||'Local';
+    add('Posts',`${prod.post_size||'5x5'} Line Post`,     linePosts,    'EA',pCst,pSup);
+    add('Posts',`${prod.post_size||'5x5'} End/Terminal Post`,totalTerminal,'EA',pCst,pSup);
+    if(corners>0) add('Posts',`${prod.post_size||'5x5'} Corner Post`,corners,'EA',pCst,pSup);
+    if(prod.material==='vinyl') add('Hardware','Post Cap — Pyramid',totalPosts,'EA',1.86,pSup);
+    const digType=parseInt(document.getElementById('sel-dig').value)||0;
+    if(digType===0||digType===1) add('Concrete','Concrete 80lb Bag',totalPosts*2,'BAG',5.98,'The Home Depot');
+    else add('Hardware','3/8"×3 3/4" Wedge Anchor',totalPosts*4,'EA',0.83,'The Home Depot');
+    add('Hardware','Fasteners Kit',1,'KIT',50.00,'Local');
+    // Lattice addon (vinyl)
+    if(state.addons.has('lattice_top')){
+      const la=prod.addons?.find(a=>a.key==='lattice_top');
+      add('Add-On','Lattice Top Panel',secs,'EA',la?.cost_value||25,la?.supplier||'Local');
+    }
+    // Gates (kit-based for vinyl/alum, or P-based fallback)
+    const gr=gateRates();
+    const gWSup=prod.addons?.find(a=>a.key==='gate_walk'&&a.cost_type==='kit')?.supplier||pSup;
+    const gDSup=prod.addons?.find(a=>a.key==='gate_double'&&a.cost_type==='kit')?.supplier||pSup;
+    if(gWalk) add('Gates',`Walk Gate — ${prod.product_name}`,gWalk,'EA',gr.walk,gWSup);
+    if(gDbl)  add('Gates',`Double Drive Gate — ${prod.product_name}`,gDbl,'EA',gr.dbl,gDSup);
+    if(gCustQ&&gCustW) add('Gates',`Custom ${gCustW}ft Gate`,gCustQ,'EA',gCustW*(prod.material==='vinyl'?P.gateCustomVinyl:P.gateCustomAlCl));
 
-    // ── GATES
-    if(gWalk)  add('Gates', `${hft}ft Single Walk Gate — Black Aluminum`, gWalk, 'EA', P.gateWalkAlCl, 'Patriot Aluminum');
-    if(gDbl)   add('Gates', `${hft}ft Double Drive Gate — Black Aluminum`, gDbl, 'EA', P.gateDblAlCl, 'Patriot Aluminum');
-    if(gCustQ&&gCustW) add('Gates', `Custom ${gCustW}ft Gate — Aluminum`, gCustQ, 'EA', gCustW*P.gateCustomAlCl);
+  // ══ STYLE: vinyl_horizontal ══════════════════════════════
+  } else if(st==='vinyl_horizontal'){
+    const rPerSec=prod.infill_units_per_section||prod.rails_per_section||3;
+    add('Rails',prod.infill_desc||'Vinyl Rail',secs*rPerSec,'EA',prod.infill_cost_ea||15.35,prod.infill_supplier||'Imperial Fence');
+    const pCst=hft<=4?(prod.post_cost_6ft||prod.post_cost_8ft||25):(prod.post_cost_8ft||prod.post_cost_6ft||25);
+    const pSup=prod.post_supplier||'Imperial Fence';
+    add('Posts',`${prod.post_size||'5x5 vinyl'} Post`,totalPosts,'EA',pCst,pSup);
+    const digType=parseInt(document.getElementById('sel-dig').value)||0;
+    if(digType===0||digType===1) add('Concrete','Concrete 80lb Bag',totalPosts*2,'BAG',5.98,'The Home Depot');
+    if(state.addons.has('wire_mesh')){
+      const ma=prod.addons?.find(a=>a.key==='wire_mesh');
+      add('Add-On','Galvanized Wire Mesh',lf,'LF',ma?.cost_value||2.00,ma?.supplier||'Imperial Fence');
+    }
+    const gr=gateRates();
+    const gWSup=prod.addons?.find(a=>a.key==='gate_walk'&&a.cost_type==='kit')?.supplier||pSup;
+    const gDSup=prod.addons?.find(a=>a.key==='gate_double'&&a.cost_type==='kit')?.supplier||pSup;
+    if(gWalk) add('Gates',`Walk Gate — ${prod.product_name}`,gWalk,'EA',gr.walk,gWSup);
+    if(gDbl)  add('Gates',`Double Drive Gate — ${prod.product_name}`,gDbl,'EA',gr.dbl,gDSup);
 
-    add('Concrete', 'Concrete 80lb Bag', totalPosts*2, 'BAG', 5.98, 'The Home Depot');
-    add('Hardware', 'Fasteners Kit (per project)', 1, 'KIT', 50.00, 'The Home Depot');
-
-  } else { // chain link
-    const meshCost = t===G ? 1.85 : t===B ? 1.96 : 2.93; // $/ft galv vs black
-    const meshDesc = t===G ? `${hft}ft Galvanized 11.5ga Chain Link Mesh` :
-                     t===B ? `${hft}ft Black PVC 9ga Chain Link Mesh` :
-                             `${hft}ft Black PVC Commercial Chain Link Mesh`;
-    add('Mesh', meshDesc, lf*1.03, 'LF', meshCost, 'Master Halco'); // 3% overlap waste
-
-    // ── TOP RAIL (1 3/8" × 21ft sections)
-    add('Rail', '1 3/8"×21ft Top Rail — Galvanized', Math.ceil(lf/21), 'EA', 0.79*21, 'Master Halco');
-
-    // ── TENSION WIRE
-    add('Hardware', '9ga Tension Wire Roll (150ft)', Math.ceil(lf/150)*2, 'ROLL', 13.35, 'Master Halco'); // top + bottom
-
-    // ── TERMINAL POSTS (corners + ends)
-    const termPostH = hft<=4?6:hft<=5?7:8;
-    add('Posts', `2 3/8"×${termPostH}ft Terminal Post — 17ga`, corners+totalTerminal, 'EA', hft<=4?8.24:hft<=5?10.36:11.46, 'Master Halco');
-
-    // ── LINE POSTS
-    add('Posts', `1 5/8"×${termPostH}ft Line Post — 17ga`, linePosts, 'EA', hft<=4?5.36:hft<=5?6.42:7.91, 'Master Halco');
-
-    // ── POST CAPS
-    add('Hardware', 'Post Cap / Dome Cap', totalPosts, 'EA', 0.85, 'Master Halco');
-
-    // ── RAIL ENDS
-    add('Hardware', '1 3/8" Rail End', corners+totalTerminal, 'EA', 0.74, 'Master Halco');
-
-    // ── TIES
-    add('Hardware', '9ga Aluminum Ties (per 100ft)', Math.ceil(lf/100), 'BAG', 9.00, 'Master Halco');
-
-    // ── GATES
-    if(gWalk)  add('Gates', `${hft}ft Single Walk Gate`, gWalk, 'EA', P.gateWalkAlCl, 'Master Halco');
-    if(gDbl)   add('Gates', `${hft}ft Double Drive Gate`, gDbl, 'EA', P.gateDblAlCl, 'Master Halco');
-    if(gCustQ&&gCustW) add('Gates', `Custom ${gCustW}ft Gate`, gCustQ, 'EA', gCustW*P.gateCustomAlCl);
-
-    add('Concrete', 'Concrete 80lb Bag', totalPosts*2, 'BAG', 5.98, 'The Home Depot');
-    add('Hardware', 'Fasteners/Clips Kit', 1, 'KIT', 25.00, 'Master Halco');
-
-    // ── Add-on: black mesh upgrade note
-    if(state.addons.has('addonBlackMesh:3')) add('Add-On','Upgrade: Black PVC Mesh (replace galv)',1,'NOTE',0);
-    if(state.addons.has('addonBarb:3'))      add('Add-On','Barbed Wire 3-strand Top — linear ft',lf,'LF',0.45,'Master Halco');
-    if(state.addons.has('addonSlats:3'))     add('Add-On','Privacy Slats — linear ft',lf,'LF',1.20,'Master Halco');
+  // ══ STYLE: mesh (chain link) ═════════════════════════════
+  } else if(st==='mesh'){
+    const meshCost=prod.infill_cost_ea||1.85;
+    add('Mesh',`${hft}ft ${prod.infill_desc||'Chain Link Mesh'}`,lf*1.03,'LF',meshCost,prod.infill_supplier||'Master Halco');
+    if(prod.rail_cost_ea) add('Rail',prod.rail_desc||'Top Rail',Math.ceil(lf/21),'EA',prod.rail_cost_ea,prod.rail_supplier||'Master Halco');
+    const termH=hft<=4?6:hft<=5?7:8;
+    const termCost=hft<=4?(prod.post_cost_6ft||8.24):(prod.post_cost_8ft||11.46);
+    const lineCost=termCost*0.67;
+    add('Posts',`2 3/8"×${termH}ft Terminal Post`,corners+totalTerminal,'EA',termCost,prod.post_supplier||'Master Halco');
+    add('Posts',`1 5/8"×${termH}ft Line Post`,     linePosts,           'EA',lineCost,prod.post_supplier||'Master Halco');
+    add('Hardware','Post Cap / Dome Cap',totalPosts,'EA',0.85,prod.post_supplier||'Master Halco');
+    add('Hardware','1 3/8" Rail End',corners+totalTerminal,'EA',0.74,prod.post_supplier||'Master Halco');
+    add('Hardware','9ga Tension Wire Roll (150ft)',Math.ceil(lf/150)*2,'ROLL',13.35,prod.post_supplier||'Master Halco');
+    add('Hardware','9ga Aluminum Ties (per 100ft)',Math.ceil(lf/100),'BAG',9.00,prod.post_supplier||'Master Halco');
+    add('Concrete','Concrete 80lb Bag',totalPosts*2,'BAG',5.98,'The Home Depot');
+    add('Hardware','Fasteners/Clips Kit',1,'KIT',25.00,prod.post_supplier||'Master Halco');
+    const gr=gateRates();
+    const gPS=prod.post_supplier||'Master Halco';
+    if(gWalk) add('Gates',`${hft}ft Walk Gate`,gWalk,'EA',gr.walk,gPS);
+    if(gDbl)  add('Gates',`${hft}ft Double Drive Gate`,gDbl,'EA',gr.dbl,gPS);
+    if(gCustQ&&gCustW) add('Gates',`Custom ${gCustW}ft Gate`,gCustQ,'EA',gCustW*P.gateCustomAlCl);
+    if(state.addons.has('black_vinyl_mesh')) add('Add-On','Black PVC Mesh Upgrade',1,'NOTE',0);
+    if(state.addons.has('barb_wire')){
+      const ba=prod.addons?.find(a=>a.key==='barb_wire');
+      add('Add-On','Barbed Wire 3-strand Top',lf,'LF',ba?.cost_value||0.45,ba?.supplier||'Local');
+    }
+    if(state.addons.has('privacy_slats')){
+      const sa=prod.addons?.find(a=>a.key==='privacy_slats');
+      add('Add-On','Privacy Slats',lf,'LF',sa?.cost_value||1.20,sa?.supplier||'Local');
+    }
   }
 
   return items;
@@ -2074,8 +2338,7 @@ async function submitBOM(){
 
   const posts  = countPosts();
   const bom    = buildBOM();
-  const tData  = tierDisplayData(state.mat);
-  const td     = tData[['good','better','cedar'].indexOf(state.tier)];
+  const _sbProd = getProduct();
   const gWalk  = parseInt(document.getElementById('gate-walk').value)||0;
   const gDbl   = parseInt(document.getElementById('gate-double').value)||0;
   const gCustQ = parseInt(document.getElementById('gate-custom-qty').value)||0;
@@ -2093,8 +2356,8 @@ async function submitBOM(){
     actualMarginPct,
     // Fence spec
     material:   state.mat,
-    tier:       state.tier,
-    supplier:   td?.supplier || '',
+    productId:  state.productId,
+    product:    _sbProd?.product_name || '',
     height:     state.height,
     linearFt:   posts.lf,
     sections:   posts.secs,
