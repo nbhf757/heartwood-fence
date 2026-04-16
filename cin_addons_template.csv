@@ -1,20 +1,32 @@
 product_id,addon_key,addon_label,cost_type,cost_value,supplier,notes
-INSTRUCTIONS,,Label shown in app checkbox,"ea (app derives $/lf from count) OR lf (sold by the foot — enter $/lf directly)","If cost_type=ea: cost per unit ($). If cost_type=lf: cost per linear foot ($).",Supplier for this add-on material,Notes
-cin_wood_privacy_pt,board_on_board,Board on Board,ea,?,?,App adds 70% more pickets at the same EA cost — just confirm the picket EA cost matches the main product
-cin_wood_privacy_pt,lattice_top,Lattice Top,ea,?,?,Cost per 4x8 lattice panel. App uses ceil(sections/2) panels and switches to 4ft pickets.
-cin_wood_privacy_pt,top_cap_fascia,Top Cap & Fascia,ea,?,?,Cost per 2x6x8 cap board (1 per section). Fascia board cost separate — what size does CIN use?
-cin_wood_privacy_pt,gaps_in_pickets,Gaps in Pickets,ea,?,?,Negative add-on — reduces picket count. Enter as negative EA cost or leave 0 if it's just a labor/style note.
-cin_wood_privacy_cedar,board_on_board,Board on Board,ea,?,?,
-cin_wood_privacy_cedar,lattice_top,Lattice Top,ea,?,?,
-cin_wood_privacy_cedar,top_cap_fascia,Top Cap & Fascia,ea,?,?,
-cin_wood_horiz_cap,board_on_board,Board on Board,ea,?,?,Doubles horizontal boards — confirm if CIN offers this on horizontal privacy
-cin_wood_ky_3rail,wire_mesh,Wire Mesh,lf,?,?,Sold by the linear foot — enter $/lf. Confirm gauge and supplier.
+INSTRUCTIONS,,Label shown in app checkbox,"ea = cost per unit (app calculates how many units and derives $/lf). lf = sold by the foot (enter $/lf directly). kit = fixed cost per gate opening.",Cost per unit / per lf / per kit ($),Supplier,Notes
+cin_wood_privacy_pt,board_on_board,Board on Board,ea,2.20,Mills,Same picket EA cost as base product — app adds 70% more pickets
+cin_wood_privacy_pt,lattice_top,Lattice Top,ea,?,?,Cost per 4x8 lattice panel — app uses ceil(sections/2) panels and switches to 4ft pickets ($2.20 EA)
+cin_wood_privacy_pt,top_cap_fascia,Top Cap & Fascia,ea,?,Mills,Need: cost per 2x6x8 cap board AND cost per 1x6x16 fascia board at Mills
+cin_wood_privacy_pt,gaps_in_pickets,Gaps in Pickets,ea,0,n/a,Style/layout note only — no material cost change. App reduces picket count ~15%.
+cin_wood_privacy_pt_8ft,board_on_board,Board on Board,ea,3.90,Mills,Same picket EA cost as 8ft base product
+cin_wood_privacy_pt_8ft,top_cap_fascia,Top Cap & Fascia,ea,?,Mills,Need: 2x6x8 cap board cost and 1x6x16 fascia board cost at Mills
+cin_wood_privacy_cedar,board_on_board,Board on Board,ea,4.79,SPS,Same cedar picket EA cost as base product
+cin_wood_privacy_cedar,lattice_top,Lattice Top,ea,?,?,Cost per 4x8 lattice panel — app switches to 4ft cedar pickets ($4.79 EA)
+cin_wood_privacy_cedar,top_cap_fascia,Top Cap & Fascia,ea,?,?,Need: cost per 2x6x8 cedar cap board and fascia board — cedar or PT?
+cin_wood_horiz_cap,board_on_board,Board on Board,ea,6.58,Mills,Doubles horizontal boards — confirm CIN offers this on horizontal privacy
+cin_wood_ky_3rail,wire_mesh,Wire Mesh,lf,?,?,Galvanized wire mesh behind rails — need $/lf and supplier
 cin_wood_ky_4rail,wire_mesh,Wire Mesh,lf,?,?,
 cin_wood_split_3rail,wire_mesh,Wire Mesh,lf,?,?,
 cin_wood_split_2rail,wire_mesh,Wire Mesh,lf,?,?,
-cin_vinyl_privacy,color_upgrade,Color Upgrade,lf,?,?,Upcharge per LF for non-white color
-cin_vinyl_privacy,lattice_top,Lattice Top Panel,ea,?,?,Panel-based lattice top — cost per panel
-cin_vinyl_ranchrail,wire_mesh,Wire Mesh,lf,?,?,Same mesh product as wood ranch rail or different?
-cin_chainlink,black_vinyl_upgrade,Black Vinyl Coated Mesh,lf,?,Master Halco,Upcharge per LF over galvanized mesh price
+cin_vinyl_privacy,color_upgrade,Color Upgrade,lf,?,?,Upcharge per LF for non-white color — SPS or Imperial?
+cin_vinyl_privacy,lattice_top,Lattice Top Panel,ea,?,?,Cost per vinyl lattice top panel from SPS
+cin_vinyl_privacy,gate_walk,Walk Gate,kit,?,SPS,Prefab kit — fixed cost per gate
+cin_vinyl_privacy,gate_double,Double Drive Gate,kit,?,SPS,Prefab kit — fixed cost per gate
+cin_vinyl_ranchrail,wire_mesh,Wire Mesh,lf,?,?,Wire mesh behind vinyl rails — same product as wood mesh?
+cin_vinyl_ranchrail,gate_walk,Walk Gate,kit,?,Imperial Fence,Prefab kit — fixed cost per gate
+cin_vinyl_ranchrail,gate_double,Double Drive Gate,kit,?,Imperial Fence,Prefab kit — fixed cost per gate
+cin_alum_4ft,gate_walk,Walk Gate,kit,?,SPS,Prefab kit — fixed cost per gate
+cin_alum_4ft,gate_double,Double Drive Gate,kit,?,SPS,Prefab kit — fixed cost per gate
+cin_alum_6ft,gate_walk,Walk Gate,kit,?,Imperial Fence,Prefab kit — fixed cost per gate
+cin_alum_6ft,gate_double,Double Drive Gate,kit,?,Imperial Fence,Prefab kit — fixed cost per gate
+cin_chainlink,black_vinyl_upgrade,Black Vinyl Coated Mesh,lf,?,Master Halco,Upcharge per LF over galvanized ($4.66) — or enter full black mesh cost and leave galvanized as base
 cin_chainlink,barb_wire,Barb Wire,lf,?,?,Cost per LF
 cin_chainlink,privacy_slats,Privacy Slats,lf,?,?,Cost per LF
+cin_chainlink,gate_walk,Walk Gate,kit,?,Master Halco,Prefab kit — fixed cost per gate
+cin_chainlink,gate_double,Double Drive Gate,kit,?,Master Halco,Prefab kit — fixed cost per gate
