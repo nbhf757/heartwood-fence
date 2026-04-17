@@ -2396,6 +2396,8 @@ function buildBOM(){
   const prod = getProduct();
   const st   = prod?.style_template || 'privacy_picket';
   const hft  = parseFloat(state.height); // numeric fence height
+  const branch = document.getElementById('branch-select')?.value || 'VB';
+  const concBagsPerPost = branch === 'CIN' ? 1 : 2;
   const gWalk  = parseInt(document.getElementById('gate-walk').value)||0;
   const gDbl   = parseInt(document.getElementById('gate-double').value)||0;
   const gCustW = parseFloat(document.getElementById('gate-custom-width').value)||0;
@@ -2467,7 +2469,7 @@ function buildBOM(){
     const derivedGP = (gWalk+gDbl+(gCustQ&&gCustW?gCustQ:0))*2;
     const regPosts  = Math.max(0, totalPosts-derivedGP);
     if(regPosts>0) add('Posts',`${pSize}x${pLen} Post — Treated Pine`,regPosts,'EA',linPostCost,prod.post_supplier||'Decks & Docks');
-    add('Concrete','Concrete 80lb Bag',totalPosts*2,'BAG',5.98,'The Home Depot');
+    add('Concrete','Concrete 80lb Bag',totalPosts*concBagsPerPost,'BAG',5.98,'The Home Depot');
     const screwBoxes=Math.ceil(lf/50);
     add('Fasteners','Wood Screws 1lb/124ct — 1 5/8"',screwBoxes,'BOX',10.97,'The Home Depot');
     add('Fasteners','Nails — subcontractor allowance',1,'ALLOW',Math.round(0.25*lf*100)/100,'Subcontractor');
@@ -2509,7 +2511,7 @@ function buildBOM(){
     const derivedGP=(gWalk+gDbl+(gCustQ&&gCustW?gCustQ:0))*2;
     const regPosts=Math.max(0,totalPosts-derivedGP);
     if(regPosts>0) add('Posts',`${prod.post_size||'4x4'}x${hft<=4?6:8} Post`,regPosts,'EA',pCst,prod.post_supplier||'Local');
-    add('Concrete','Concrete 80lb Bag',totalPosts*2,'BAG',5.98,'The Home Depot');
+    add('Concrete','Concrete 80lb Bag',totalPosts*concBagsPerPost,'BAG',5.98,'The Home Depot');
     add('Fasteners','Nails / Screws — allowance',1,'ALLOW',Math.round(0.25*lf*100)/100,'Subcontractor');
     if(state.addons.has('wire_mesh')){
       const ma=prod.addons?.find(a=>a.key==='wire_mesh');
@@ -2536,7 +2538,7 @@ function buildBOM(){
     const derivedGP=(gWalk+gDbl+(gCustQ&&gCustW?gCustQ:0))*2;
     const regPosts=Math.max(0,totalPosts-derivedGP);
     if(regPosts>0) add('Posts',`${prod.post_size||'4x4'}x6 Post — Mortise`,regPosts,'EA',pCst,prod.post_supplier||'Mills');
-    add('Concrete','Concrete 80lb Bag',totalPosts*2,'BAG',5.98,'The Home Depot');
+    add('Concrete','Concrete 80lb Bag',totalPosts*concBagsPerPost,'BAG',5.98,'The Home Depot');
     add('Fasteners','Hardware allowance',1,'ALLOW',Math.round(0.25*lf*100)/100,'Subcontractor');
     if(state.addons.has('wire_mesh')){
       const ma=prod.addons?.find(a=>a.key==='wire_mesh');
@@ -2561,7 +2563,7 @@ function buildBOM(){
     if(corners>0) add('Posts',`${prod.post_size||'5x5'} Corner Post`,corners,'EA',pCst,pSup);
     if(prod.material==='vinyl') add('Hardware','Post Cap — Pyramid',totalPosts,'EA',1.86,pSup);
     const digType=parseInt(document.getElementById('sel-dig').value)||0;
-    if(digType===0||digType===1) add('Concrete','Concrete 80lb Bag',totalPosts*2,'BAG',5.98,'The Home Depot');
+    if(digType===0||digType===1) add('Concrete','Concrete 80lb Bag',totalPosts*concBagsPerPost,'BAG',5.98,'The Home Depot');
     else add('Hardware','3/8"×3 3/4" Wedge Anchor',totalPosts*4,'EA',0.83,'The Home Depot');
     add('Hardware','Fasteners Kit',1,'KIT',50.00,'Local');
     // Lattice addon (vinyl)
@@ -2585,7 +2587,7 @@ function buildBOM(){
     const pSup=prod.post_supplier||'Imperial Fence';
     add('Posts',`${prod.post_size||'5x5 vinyl'} Post`,totalPosts,'EA',pCst,pSup);
     const digType=parseInt(document.getElementById('sel-dig').value)||0;
-    if(digType===0||digType===1) add('Concrete','Concrete 80lb Bag',totalPosts*2,'BAG',5.98,'The Home Depot');
+    if(digType===0||digType===1) add('Concrete','Concrete 80lb Bag',totalPosts*concBagsPerPost,'BAG',5.98,'The Home Depot');
     if(state.addons.has('wire_mesh')){
       const ma=prod.addons?.find(a=>a.key==='wire_mesh');
       add('Add-On','Galvanized Wire Mesh',lf,'LF',ma?.cost_value||2.00,ma?.supplier||'Imperial Fence');
@@ -2610,7 +2612,7 @@ function buildBOM(){
     add('Hardware','1 3/8" Rail End',corners+totalTerminal,'EA',0.74,prod.post_supplier||'Master Halco');
     add('Hardware','9ga Tension Wire Roll (150ft)',Math.ceil(lf/150)*2,'ROLL',13.35,prod.post_supplier||'Master Halco');
     add('Hardware','9ga Aluminum Ties (per 100ft)',Math.ceil(lf/100),'BAG',9.00,prod.post_supplier||'Master Halco');
-    add('Concrete','Concrete 80lb Bag',totalPosts*2,'BAG',5.98,'The Home Depot');
+    add('Concrete','Concrete 80lb Bag',totalPosts*concBagsPerPost,'BAG',5.98,'The Home Depot');
     add('Hardware','Fasteners/Clips Kit',1,'KIT',25.00,prod.post_supplier||'Master Halco');
     const gr=gateRates();
     const gPS=prod.post_supplier||'Master Halco';
