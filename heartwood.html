@@ -2203,41 +2203,74 @@ function renderDebugPanel() {
   if (!panel || !body || !d.lf) { if(panel) panel.style.display='none'; return; }
   panel.style.display = '';
 
-  const fmt  = v => '$' + (Math.round(v)||0).toLocaleString();
-  const fmtD = v => '$' + (v||0).toFixed(2);
-  const pct  = v => (((v||0)*100).toFixed(1)) + '%';
+  const fmt   = v => '$' + (Math.round(v)||0).toLocaleString();
+  const fmtD  = v => '$' + (v||0).toFixed(2);
+  const fmtLF = v => '$' + (v||0).toFixed(2) + '/lf';
+  const pct   = v => (((v||0)*100).toFixed(1)) + '%';
+  const lf    = d.lf;
 
-  // ── Rate-based calculation ────────────────────────────────
-  const matBase    = d.lf * d.mPF;
-  const addonBase  = d.lf * d.addonM;
-  const postUpgBase= d.lf * d.postUpgPF;
-  const preMarkup  = matBase + addonBase + postUpgBase;
-  const afterMarkup= preMarkup * (1 + d.matMarkup);
-  const afterTax   = afterMarkup * (1 + d.salesTax);
-  const labBase    = d.lf * d.lPF;
-  const demoBase   = d.lf * d.demoPerFt;
+  // ── $/lf summary bar ─────────────────────────────────────
+  const matBase     = lf * d.mPF;
+  const addonBase   = lf * d.addonM;
+  const postUpgBase = lf * d.postUpgPF;
+  const preMarkup   = matBase + addonBase + postUpgBase;
+  const afterMarkup = preMarkup * (1 + d.matMarkup);
+  const afterTax    = afterMarkup * (1 + d.salesTax);
+  const labBase     = lf * d.lPF;
+  const demoBase    = lf * d.demoPerFt;
 
+  const matLF   = d.matTotal / lf;
+  const labLF   = d.labTotal / lf;
+  const gateLF  = d.gateCost / lf;
+  const otherLF = (d.digCost + d.permitCost + d.opsCost) / lf;
+  const cogsLF  = d.total / lf;
+  const sellLF  = d.sell / lf;
+  const floorLF = d.floor / lf;
+
+  const summaryRows = [
+    ['Material (after markup+tax)', matLF, d.matTotal],
+    ['Labor', labLF, d.labTotal],
+    ...(d.gateCost  ? [['Gates (labor+material kits)', gateLF, d.gateCost]] : []),
+    ...(d.digCost+d.permitCost+d.opsCost > 0 ? [['Dig / permit / ops', otherLF, d.digCost+d.permitCost+d.opsCost]] : []),
+  ].map(([label, plf, total]) =>
+    `<tr><td>${label}</td><td style="text-align:right">${fmtLF(plf)}</td><td style="text-align:right">${fmt(total)}</td></tr>`
+  ).join('');
+
+  const lfSummary = `
+    <div style="overflow-x:auto">
+      <table class="debug-table">
+        <thead><tr><th>Cost component</th><th style="text-align:right">$/lf</th><th style="text-align:right">Total (${lf} lf)</th></tr></thead>
+        <tbody>
+          ${summaryRows}
+          <tr class="subtotal"><td>COGS total</td><td style="text-align:right">${fmtLF(cogsLF)}</td><td style="text-align:right">${fmt(d.total)}</td></tr>
+          <tr class="total-row"><td>→ Suggested sell (${pct(d.cr)} COGS rate)</td><td style="text-align:right">${fmtLF(sellLF)}</td><td style="text-align:right">${fmt(d.sell)}</td></tr>
+          <tr class="total-row"><td>→ Floor price (33% margin min)</td><td style="text-align:right">${fmtLF(floorLF)}</td><td style="text-align:right">${fmt(d.floor)}</td></tr>
+        </tbody>
+      </table>
+    </div>`;
+
+  // ── Rate-based calculation detail ────────────────────────
   let calcRows = `
-    <div class="debug-calc-row"><span>Material base rate</span><span>${fmtD(d.mPF)}/lf × ${d.lf} lf = ${fmt(matBase)}</span></div>
-    ${d.addonM   ? `<div class="debug-calc-row"><span>Add-on material</span><span>${fmtD(d.addonM)}/lf × ${d.lf} lf = ${fmt(addonBase)}</span></div>` : ''}
-    ${d.postUpgPF? `<div class="debug-calc-row"><span>Post upgrade</span><span>${fmtD(d.postUpgPF)}/lf × ${d.lf} lf = ${fmt(postUpgBase)}</span></div>` : ''}
-    <div class="debug-calc-row subtotal"><span>Material at cost (pre-markup)</span><span>${fmt(preMarkup)}</span></div>
+    <div class="debug-calc-row"><span>Material base rate</span><span>${fmtD(d.mPF)}/lf × ${lf} lf = ${fmt(matBase)}</span></div>
+    ${d.addonM    ? `<div class="debug-calc-row"><span>Add-on material</span><span>${fmtD(d.addonM)}/lf × ${lf} lf = ${fmt(addonBase)}</span></div>` : ''}
+    ${d.postUpgPF ? `<div class="debug-calc-row"><span>Post upgrade</span><span>${fmtD(d.postUpgPF)}/lf × ${lf} lf = ${fmt(postUpgBase)}</span></div>` : ''}
+    <div class="debug-calc-row subtotal"><span>Material at cost (pre-markup) — ${fmtLF(preMarkup/lf)}</span><span>${fmt(preMarkup)}</span></div>
     <div class="debug-calc-row"><span>× Markup (${pct(d.matMarkup)})</span><span>${fmt(afterMarkup)}</span></div>
     <div class="debug-calc-row"><span>× Sales tax (${pct(d.salesTax)})</span><span>${fmt(afterTax)}</span></div>
-    <div class="debug-calc-row subtotal"><span>Material total</span><span>${fmt(d.matTotal)}</span></div>
-    <div class="debug-calc-row"><span>Labor: ${fmtD(d.lPF)}/lf × ${d.lf} lf</span><span>${fmt(labBase)}</span></div>
-    ${d.demoPerFt? `<div class="debug-calc-row"><span>Demo: ${fmtD(d.demoPerFt)}/lf × ${d.lf} lf</span><span>${fmt(demoBase)}</span></div>` : ''}
-    <div class="debug-calc-row subtotal"><span>Labor total</span><span>${fmt(d.labTotal)}</span></div>`;
+    <div class="debug-calc-row subtotal"><span>Material total — ${fmtLF(matLF)}</span><span>${fmt(d.matTotal)}</span></div>
+    <div class="debug-calc-row"><span>Labor: ${fmtD(d.lPF)}/lf × ${lf} lf</span><span>${fmt(labBase)}</span></div>
+    ${d.demoPerFt ? `<div class="debug-calc-row"><span>Demo: ${fmtD(d.demoPerFt)}/lf × ${lf} lf</span><span>${fmt(demoBase)}</span></div>` : ''}
+    <div class="debug-calc-row subtotal"><span>Labor total — ${fmtLF(labLF)}</span><span>${fmt(d.labTotal)}</span></div>`;
 
-  if (d.gateCost)   calcRows += `<div class="debug-calc-row"><span>Gates (${d.gW} walk × ${fmt(d.gateRateWalk)} + ${d.gD} dbl × ${fmt(d.gateRateDbl)})</span><span>${fmt(d.gateCost)}</span></div>`;
+  if (d.gateCost)   calcRows += `<div class="debug-calc-row"><span>Gates (${d.gW} walk × ${fmt(d.gateRateWalk)} + ${d.gD} dbl × ${fmt(d.gateRateDbl)}) — ${fmtLF(gateLF)}</span><span>${fmt(d.gateCost)}</span></div>`;
   if (d.digCost)    calcRows += `<div class="debug-calc-row"><span>Dig / set posts</span><span>${fmt(d.digCost)}</span></div>`;
   if (d.permitCost) calcRows += `<div class="debug-calc-row"><span>Permit</span><span>${fmt(d.permitCost)}</span></div>`;
   if (d.opsCost)    calcRows += `<div class="debug-calc-row"><span>Ops fee</span><span>${fmt(d.opsCost)}</span></div>`;
 
   calcRows += `
-    <div class="debug-calc-row total"><span>Total COGS</span><span>${fmt(d.total)}</span></div>
-    <div class="debug-calc-row total"><span>COGS rate (${pct(d.cr)}) → Suggested sell</span><span>${fmt(d.sell)}</span></div>
-    <div class="debug-calc-row total"><span>Floor price (33% margin min)</span><span>${fmt(d.floor)}</span></div>`;
+    <div class="debug-calc-row total"><span>Total COGS — ${fmtLF(cogsLF)}</span><span>${fmt(d.total)}</span></div>
+    <div class="debug-calc-row total"><span>COGS rate (${pct(d.cr)}) → Suggested sell — ${fmtLF(sellLF)}</span><span>${fmt(d.sell)}</span></div>
+    <div class="debug-calc-row total"><span>Floor price (33% margin min) — ${fmtLF(floorLF)}</span><span>${fmt(d.floor)}</span></div>`;
 
   // ── BOM detail table ──────────────────────────────────────
   const bomItems = buildBOM();
@@ -2260,24 +2293,29 @@ function renderDebugPanel() {
         <td>${it.unit}</td>
         <td style="text-align:right">${fmtD(it.unitCost)}</td>
         <td style="text-align:right">${fmt(line)}</td>
+        <td style="text-align:right;color:#8a7000">${fmtLF(line/lf)}</td>
         <td style="font-size:0.67rem;color:#8a7000">${it.supplier}</td>
       </tr>`;
     });
     grandTotal += catTotal;
-    bomRows += `<tr class="subtotal"><td colspan="5">${cat} subtotal</td><td>${fmt(catTotal)}</td><td></td></tr>`;
+    bomRows += `<tr class="subtotal"><td colspan="5">${cat} subtotal</td><td>${fmt(catTotal)}</td><td style="text-align:right">${fmtLF(catTotal/lf)}</td><td></td></tr>`;
   });
-  bomRows += `<tr class="total-row"><td colspan="5">Material subtotal (raw, pre-markup/tax)</td><td>${fmt(grandTotal)}</td><td></td></tr>`;
+  bomRows += `<tr class="total-row"><td colspan="5">Material subtotal (raw, pre-markup/tax)</td><td>${fmt(grandTotal)}</td><td style="text-align:right">${fmtLF(grandTotal/lf)}</td><td></td></tr>`;
 
   body.innerHTML = `
     <div class="debug-section">
-      <div class="debug-section-title">Quote Calculation (rate-based)</div>
+      <div class="debug-section-title">$/lf Summary</div>
+      ${lfSummary}
+    </div>
+    <div class="debug-section">
+      <div class="debug-section-title">Quote Calculation (rate-based detail)</div>
       ${calcRows}
     </div>
     <div class="debug-section">
       <div class="debug-section-title">Material BOM Detail (unit costs)</div>
       <div style="overflow-x:auto">
         <table class="debug-table">
-          <thead><tr><th>Category</th><th>Item</th><th>Qty</th><th>Unit</th><th>$/unit</th><th>Total</th><th>Supplier</th></tr></thead>
+          <thead><tr><th>Category</th><th>Item</th><th>Qty</th><th>Unit</th><th>$/unit</th><th>Total</th><th>$/lf</th><th>Supplier</th></tr></thead>
           <tbody>${bomRows}</tbody>
         </table>
       </div>
