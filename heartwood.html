@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Heartwood Fence — Quote Calculator</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <style>
@@ -203,6 +203,7 @@
     background: var(--cream); font-size: 0.74rem; font-weight: 600;
     font-family: 'DM Sans', sans-serif; color: var(--navy); cursor: pointer;
     transition: all .13s; display: flex; align-items: center; gap: 5px;
+    min-height: 44px;
   }
   .canvas-btn:hover { border-color: var(--navy); }
   .canvas-btn.active { background: var(--navy); color: #fff; border-color: var(--navy); }
@@ -529,7 +530,8 @@
   .ann-btn {
     padding: 4px 10px; border-radius: 5px; border: 1.5px solid var(--border);
     background: #fff; font-size: 0.78rem; cursor: pointer; font-family: 'DM Sans', sans-serif;
-    transition: background .1s, border-color .1s;
+    transition: background .1s, border-color .1s; min-height: 40px;
+    display: inline-flex; align-items: center;
   }
   .ann-btn:hover { border-color: var(--navy); background: #f0f4ff; }
   .ann-btn.active { border-color: var(--green); background: #f0ffe0; }
@@ -976,6 +978,8 @@ function _applyRoleUI() {
         <div class="canvas-toolbar">
           <button class="canvas-btn" id="btn-undo-draw" onclick="undoLastPoint()">↩ Undo</button>
           <button class="canvas-btn danger" onclick="clearCanvas()">✕ Clear</button>
+          <button class="canvas-btn" id="btn-pan-mode" onclick="togglePanMode()" title="Pan/drag canvas">🖐 Pan</button>
+          <button class="canvas-btn" onclick="resetView()" title="Reset zoom and pan">⟲ Reset</button>
           <button class="canvas-btn" id="btn-gate-mode" onclick="toggleGateMode()" style="display:none">🚪 Mark Gates</button>
           <button class="canvas-btn" onclick="exportCanvasPNG()" title="Save sketch as image">⬇ Save Image</button>
           <button class="canvas-btn primary" onclick="applyDrawing()" id="btn-apply">✓ Use This Layout</button>
@@ -985,7 +989,7 @@ function _applyRoleUI() {
         <div class="annotation-bar" id="annotation-bar">
           <span class="ann-label">Add Marker:</span>
           <button class="ann-btn" data-type="tree" onclick="setAnnotationType('tree')">🌳 Tree</button>
-          <button class="ann-btn" data-type="house" onclick="setAnnotationType('house')">🏠 House</button>
+          <button class="ann-btn" data-type="house" onclick="setAnnotationType('house')">⬛ Structure</button>
           <button class="ann-btn" data-type="good" onclick="setAnnotationType('good')">↑ Good Side</button>
           <button class="ann-btn" data-type="structure" onclick="setAnnotationType('structure')">▪ Structure</button>
           <button class="ann-btn" data-type="gate" onclick="setAnnotationType('gate')">⛩ Gate Spot</button>
@@ -1981,19 +1985,27 @@ function resetAll(){
 //  DRAWING ENGINE
 // ═══════════════════════════════════════════════════════════
 let drawState = {
-  points:       [],        // [{x, y}] in canvas coords
-  gateSegs:     new Set(), // indices of segments marked as gates
-  gateOverrides: new Map(), // segIdx → override ft (user-typed width)
-  scale:        8,         // pixels per foot
+  points:       [],
+  gateSegs:     new Set(),
+  gateOverrides: new Map(),
+  scale:        8,         // world pixels per foot
   gridFt:       10,        // grid cell size in feet
   closed:       false,
-  gateMode:     false,     // true = taps toggle gate segments; false = taps add points
-  mode:         'manual',  // 'manual' | 'draw'
+  gateMode:     false,
+  mode:         'manual',
+  // Viewport (pan + zoom)
+  viewOffset:   { x: 0, y: 0 },  // pan offset in CSS pixels
+  viewZoom:     1.0,              // view zoom (1 = 100%)
+  panMode:      false,
 };
 
-let annotations = [];          // [{type, x, y, label, angle, w, h}]
+let _dpr = 1;                  // device pixel ratio for Retina rendering
+let _snapIndicator = null;     // {x, y, type} — snap highlight point
+let _panMouseStart = null;     // pan drag anchor for desktop
+
+let annotations = [];
 let activeAnnotationType = null;
-let houseStart = null; // first corner for house rectangle
+let houseStart = null;
 
 function setAnnotationType(type) {
   activeAnnotationType = type;
@@ -2013,10 +2025,114 @@ function exportCanvasPNG() {
   if (!canvas || drawState.points.length < 2) {
     showToast('Draw a fence layout first', true); return;
   }
-  const a = document.createElement('a');
-  a.download = 'fence-sketch.png';
-  a.href = canvas.toDataURL('image/png');
-  a.click();
+
+  const customer = (document.getElementById('inp-customer')?.value || '').trim();
+  const address  = (document.getElementById('inp-address')?.value || '').trim();
+  const branch   = document.getElementById('branch-select')?.selectedOptions[0]?.text || '';
+  const dateStr  = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const prod     = getProduct();
+  const matLabel = [state.mat ? (state.mat.charAt(0).toUpperCase() + state.mat.slice(1)) : '',
+                    prod?.product_name || ''].filter(Boolean).join(' · ');
+  const posts    = countPosts();
+  const totalFt  = calcTotalDrawFt();
+
+  const TITLE_H = 110;
+  const cssW = canvas.width  / _dpr;
+  const cssH = canvas.height / _dpr;
+
+  const off = document.createElement('canvas');
+  off.width  = Math.round(cssW * _dpr);
+  off.height = Math.round((cssH + TITLE_H) * _dpr);
+  const ctx  = off.getContext('2d');
+
+  // Draw the fence sketch into the top portion (skipHover suppresses ghost line)
+  _renderToCtx(ctx, cssW, cssH, { skipHover: true });
+
+  // Title block — drawn in CSS-px space via DPI scale
+  ctx.save();
+  ctx.scale(_dpr, _dpr);
+
+  const ty = cssH; // top of title block in CSS px
+  // White background with top separator line
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, ty, cssW, TITLE_H);
+  ctx.strokeStyle = '#13245a';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, ty); ctx.lineTo(cssW, ty); ctx.stroke();
+
+  // Navy left accent bar
+  ctx.fillStyle = '#13245a';
+  ctx.fillRect(0, ty, 4, TITLE_H);
+
+  const pad = 14;
+  const col2 = cssW * 0.55; // right column x start
+
+  // Row 1 — Company + branch/date
+  ctx.fillStyle = '#13245a';
+  ctx.font = 'bold 13px "DM Sans", sans-serif';
+  ctx.textBaseline = 'top';
+  ctx.fillText('HEARTWOOD FENCE', pad, ty + 12);
+
+  ctx.fillStyle = '#5a6a8a';
+  ctx.font = '11px "DM Sans", sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText([branch, dateStr].filter(Boolean).join('  ·  '), cssW - pad, ty + 13);
+  ctx.textAlign = 'left';
+
+  // Row 2 — Customer + address
+  ctx.fillStyle = '#1a2340';
+  ctx.font = '11px "DM Sans", sans-serif';
+  const custLine = customer ? `Customer: ${customer}` : '';
+  if (custLine) ctx.fillText(custLine, pad, ty + 32);
+  if (address) {
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#5a6a8a';
+    ctx.fillText(address, cssW - pad, ty + 32);
+    ctx.textAlign = 'left';
+  }
+
+  // Divider
+  ctx.strokeStyle = '#d0d8e8';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad, ty + 50); ctx.lineTo(cssW - pad, ty + 50); ctx.stroke();
+
+  // Row 3 — Material + height + footage
+  const matLine = [matLabel, state.height, `${totalFt} ft`].filter(Boolean).join('  ·  ');
+  ctx.fillStyle = '#13245a';
+  ctx.font = 'bold 11px "DM Sans", sans-serif';
+  ctx.fillText(matLine, pad, ty + 58);
+
+  // Row 4 — Post counts
+  if (posts.secs > 0) {
+    const countsLine = `${posts.secs} sections  ·  ${posts.corners} corners  ·  ${posts.terminals} end posts  ·  ${posts.gatePosts} gate posts`;
+    ctx.fillStyle = '#5a6a8a';
+    ctx.font = '10px "DM Sans", sans-serif';
+    ctx.fillText(countsLine, pad, ty + 76);
+  }
+
+  // Footer tagline
+  ctx.fillStyle = '#9aa8c0';
+  ctx.font = 'italic 9px "DM Sans", sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('Generated by Heartwood Fence Quote Calculator', cssW - pad, ty + TITLE_H - 10);
+  ctx.textAlign = 'left';
+
+  ctx.restore();
+
+  const dataUrl  = off.toDataURL('image/png');
+  const filename = (address.replace(/[^a-z0-9 ]/gi, '').trim() || 'fence-sketch')
+    .replace(/\s+/g, '-').toLowerCase() + '.png';
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  if (isIOS) {
+    window.open(dataUrl, '_blank');
+    showToast('Tap share → Save Image to keep the file');
+  } else {
+    const a = document.createElement('a');
+    a.download = filename;
+    a.href = dataUrl;
+    a.click();
+  }
 }
 
 const SNAP = 10;   // snap-to-grid pixel threshold
@@ -2035,52 +2151,87 @@ function setInputMode(mode) {
 }
 
 function initCanvas() {
+  _dpr = window.devicePixelRatio || 1;
   const canvas = document.getElementById('fence-canvas');
   const wrap   = canvas.parentElement;
-  canvas.width = wrap.clientWidth || 340;
+
   // Remove old listeners to avoid duplicates
   canvas.replaceWith(canvas.cloneNode(true));
   const c = document.getElementById('fence-canvas');
-  c.width = wrap.clientWidth || 340;
+  _resizeCanvasEl(c, wrap);
 
-  // Touch events (mobile)
+  // Touch events (iPad / mobile)
   c.addEventListener('touchstart', onTouchStart, { passive: false });
+  c.addEventListener('touchmove',  onTouchMove,  { passive: false });
   c.addEventListener('touchend',   onTouchEnd,   { passive: false });
 
   // Mouse events (desktop)
-  c.addEventListener('click',    onCanvasClick);
-  c.addEventListener('mousemove',onCanvasHover);
-  c.addEventListener('dblclick', onCanvasDblClick);
+  c.addEventListener('click',     onCanvasClick);
+  c.addEventListener('mousemove', onCanvasHover);
+  c.addEventListener('dblclick',  onCanvasDblClick);
+  c.addEventListener('mousedown', onCanvasMouseDown);
+  c.addEventListener('mousemove', onCanvasMousePan);
+  c.addEventListener('mouseup',   onCanvasMouseUp);
+  c.addEventListener('mouseleave',onCanvasMouseUp);
+
+  // Wheel zoom
+  c.addEventListener('wheel', onCanvasWheel, { passive: false });
 }
+
+function _resizeCanvasEl(c, wrap) {
+  _dpr = window.devicePixelRatio || 1;
+  const cssW = (wrap.clientWidth  || 340);
+  const cssH = Math.min(Math.max(cssW * 0.6, 280), 500);
+  c.width  = Math.round(cssW * _dpr);
+  c.height = Math.round(cssH * _dpr);
+  c.style.width  = cssW + 'px';
+  c.style.height = cssH + 'px';
+}
+
+function onResizeCanvas() {
+  const c = document.getElementById('fence-canvas');
+  if (!c) return;
+  _resizeCanvasEl(c, c.parentElement);
+  renderCanvas();
+}
+
+window.addEventListener('resize', onResizeCanvas);
 
 let hoverPt = null;
 
 function canvasPos(e, canvas) {
   const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width  / rect.width;
-  const scaleY = canvas.height / rect.height;
-  let cx, cy;
-  if (e.touches) {
-    cx = (e.touches[0].clientX - rect.left) * scaleX;
-    cy = (e.touches[0].clientY - rect.top)  * scaleY;
+  // CSS pixel position within canvas
+  let cssX, cssY;
+  if (e.touches && e.touches.length > 0) {
+    cssX = e.touches[0].clientX - rect.left;
+    cssY = e.touches[0].clientY - rect.top;
+  } else if (e.changedTouches && e.changedTouches.length > 0) {
+    cssX = e.changedTouches[0].clientX - rect.left;
+    cssY = e.changedTouches[0].clientY - rect.top;
   } else {
-    cx = (e.clientX - rect.left) * scaleX;
-    cy = (e.clientY - rect.top)  * scaleY;
+    cssX = e.clientX - rect.left;
+    cssY = e.clientY - rect.top;
   }
-  const gridPt = snapToGrid(cx, cy);
-  // Only half-ft snap when actively drawing fence points (not gate mode, not annotation mode)
+  // Convert CSS px → world coords (undo viewport transform)
+  const worldX = (cssX - drawState.viewOffset.x) / drawState.viewZoom;
+  const worldY = (cssY - drawState.viewOffset.y) / drawState.viewZoom;
+
+  const gridPt = snapToGrid(worldX, worldY);
   if (!drawState.gateMode && !drawState.closed && !activeAnnotationType && drawState.points.length > 0) {
-    return snapToHalfFt(gridPt);
+    const snappedHalf = snapToHalfFt(gridPt);
+    return snapToGeometry(snappedHalf);
   }
-  return gridPt;
+  return snapToGeometry(gridPt);
 }
 
 function snapToGrid(cx, cy) {
   const cell = drawState.scale * drawState.gridFt;
+  const snap = SNAP / drawState.viewZoom; // threshold in world coords
   const sx = Math.round(cx / cell) * cell;
   const sy = Math.round(cy / cell) * cell;
-  if (Math.abs(cx - sx) < SNAP) cx = sx;
-  if (Math.abs(cy - sy) < SNAP) cy = sy;
+  if (Math.abs(cx - sx) < snap) cx = sx;
+  if (Math.abs(cy - sy) < snap) cy = sy;
   return { x: cx, y: cy };
 }
 
@@ -2099,29 +2250,191 @@ function snapToHalfFt(pt) {
   return { x: last.x + (dx / rawPx) * snappedPx, y: last.y + (dy / rawPx) * snappedPx };
 }
 
+// ── Geometry snap (endpoints + structure edges) ──────────────
+function snapToGeometry(worldPt) {
+  const threshold = (SNAP * 3) / drawState.viewZoom;
+  // Snap to existing fence endpoints
+  for (const pt of drawState.points) {
+    if (Math.hypot(worldPt.x - pt.x, worldPt.y - pt.y) < threshold) {
+      _snapIndicator = { x: pt.x, y: pt.y };
+      return { x: pt.x, y: pt.y };
+    }
+  }
+  // Snap to structure rectangle edges
+  for (const ann of annotations) {
+    if (ann.type !== 'house') continue;
+    const edges = [
+      [{ x: ann.x,       y: ann.y       }, { x: ann.x+ann.w, y: ann.y       }],
+      [{ x: ann.x,       y: ann.y+ann.h }, { x: ann.x+ann.w, y: ann.y+ann.h }],
+      [{ x: ann.x,       y: ann.y       }, { x: ann.x,       y: ann.y+ann.h }],
+      [{ x: ann.x+ann.w, y: ann.y       }, { x: ann.x+ann.w, y: ann.y+ann.h }],
+    ];
+    for (const [a, b] of edges) {
+      const snapped = _nearestOnSeg(worldPt, a, b);
+      if (Math.hypot(worldPt.x - snapped.x, worldPt.y - snapped.y) < threshold) {
+        _snapIndicator = { x: snapped.x, y: snapped.y };
+        return snapped;
+      }
+    }
+  }
+  _snapIndicator = null;
+  return worldPt;
+}
+
+function _nearestOnSeg(p, a, b) {
+  const dx = b.x-a.x, dy = b.y-a.y;
+  const len2 = dx*dx + dy*dy;
+  if (len2 === 0) return { x: a.x, y: a.y };
+  const t = Math.max(0, Math.min(1, ((p.x-a.x)*dx + (p.y-a.y)*dy) / len2));
+  return { x: a.x + t*dx, y: a.y + t*dy };
+}
+
+// ── Touch handlers ────────────────────────────────────────────
 let lastTapTime = 0;
 let _justClosed = false;
+let _touchState = null; // { fingers, startDist, startMid, startOffset, startZoom, tapPt, hasMoved }
+
 function onTouchStart(e) {
   e.preventDefault();
-  const now = Date.now();
-  const isDbl = (now - lastTapTime) < 300;
-  lastTapTime = now;
-  const pt = canvasPos(e, e.target);
-  if (isDbl) { closeFence(); _justClosed = true; return; }
-  handlePoint(pt, e.target);
+  if (e.touches.length === 1) {
+    _touchState = {
+      fingers: 1,
+      tapPt: canvasPos(e, e.target),
+      hasMoved: false,
+    };
+    // Double-tap to close fence
+    const now = Date.now();
+    if ((now - lastTapTime) < 300) { closeFence(); _justClosed = true; _touchState = null; }
+    lastTapTime = now;
+  } else if (e.touches.length === 2) {
+    const dx = e.touches[1].clientX - e.touches[0].clientX;
+    const dy = e.touches[1].clientY - e.touches[0].clientY;
+    _touchState = {
+      fingers: 2,
+      startDist:   Math.hypot(dx, dy),
+      startMid:    { x: (e.touches[0].clientX+e.touches[1].clientX)/2,
+                     y: (e.touches[0].clientY+e.touches[1].clientY)/2 },
+      startOffset: { ...drawState.viewOffset },
+      startZoom:   drawState.viewZoom,
+    };
+  }
 }
-function onTouchEnd(e) { e.preventDefault(); }
+
+function onTouchMove(e) {
+  e.preventDefault();
+  if (!_touchState) return;
+  const canvas = e.target;
+  const rect   = canvas.getBoundingClientRect();
+
+  if (e.touches.length === 2 && _touchState.fingers === 2) {
+    // Two-finger pinch zoom + pan
+    const dx   = e.touches[1].clientX - e.touches[0].clientX;
+    const dy   = e.touches[1].clientY - e.touches[0].clientY;
+    const dist = Math.hypot(dx, dy);
+    const rawZoom = _touchState.startZoom * (dist / _touchState.startDist);
+    const newZoom = Math.max(0.25, Math.min(6, rawZoom));
+    const ratio = newZoom / _touchState.startZoom;
+    const mid = { x: (e.touches[0].clientX+e.touches[1].clientX)/2,
+                   y: (e.touches[0].clientY+e.touches[1].clientY)/2 };
+    const smx = _touchState.startMid.x - rect.left;
+    const smy = _touchState.startMid.y - rect.top;
+    const panDx = mid.x - _touchState.startMid.x;
+    const panDy = mid.y - _touchState.startMid.y;
+    drawState.viewOffset.x = smx - (smx - _touchState.startOffset.x) * ratio + panDx;
+    drawState.viewOffset.y = smy - (smy - _touchState.startOffset.y) * ratio + panDy;
+    drawState.viewZoom = newZoom;
+    renderCanvas();
+  } else if (e.touches.length === 1 && _touchState.fingers === 1) {
+    const cssX = e.touches[0].clientX - rect.left;
+    const cssY = e.touches[0].clientY - rect.top;
+    if (drawState.panMode) {
+      if (!_touchState.panStart) {
+        _touchState.panStart = { css: {x: cssX, y: cssY}, offset: { ...drawState.viewOffset } };
+      }
+      drawState.viewOffset.x = _touchState.panStart.offset.x + cssX - _touchState.panStart.css.x;
+      drawState.viewOffset.y = _touchState.panStart.offset.y + cssY - _touchState.panStart.css.y;
+      _touchState.hasMoved = true;
+      renderCanvas();
+    } else {
+      // Update hover point for live rubber-band + structure preview
+      hoverPt = canvasPos(e, canvas);
+      _touchState.hasMoved = Math.hypot(cssX - (_touchState.tapPt ? (_touchState.tapPt.x * drawState.viewZoom + drawState.viewOffset.x) : cssX), cssY - (_touchState.tapPt ? (_touchState.tapPt.y * drawState.viewZoom + drawState.viewOffset.y) : cssY)) > 8;
+      renderCanvas();
+    }
+  }
+}
+
+function onTouchEnd(e) {
+  e.preventDefault();
+  if (!_touchState) return;
+  if (_touchState.fingers === 1 && !_justClosed && !_touchState.hasMoved && !drawState.panMode) {
+    const pt = canvasPos(e, e.target);
+    handlePoint(pt, e.target);
+  }
+  if (e.touches.length === 0) { _touchState = null; _justClosed = false; hoverPt = null; renderCanvas(); }
+}
 
 function onCanvasClick(e) {
+  if (drawState.panMode) return; // pan mode eats mouse clicks
   const pt = canvasPos(e, e.target);
   handlePoint(pt, e.target);
 }
 function onCanvasDblClick(e) {
   e.preventDefault();
-  closeFence();
+  if (!drawState.panMode) closeFence();
+}
+function onCanvasMouseDown(e) {
+  if (!drawState.panMode) return;
+  const rect = e.target.getBoundingClientRect();
+  _panMouseStart = {
+    cssX: e.clientX - rect.left,
+    cssY: e.clientY - rect.top,
+    ox: drawState.viewOffset.x,
+    oy: drawState.viewOffset.y,
+  };
+}
+function onCanvasMousePan(e) {
+  if (!drawState.panMode || !_panMouseStart) return;
+  const rect = e.target.getBoundingClientRect();
+  const cssX = e.clientX - rect.left;
+  const cssY = e.clientY - rect.top;
+  drawState.viewOffset.x = _panMouseStart.ox + cssX - _panMouseStart.cssX;
+  drawState.viewOffset.y = _panMouseStart.oy + cssY - _panMouseStart.cssY;
+  renderCanvas();
+}
+function onCanvasMouseUp() { _panMouseStart = null; }
+function onCanvasWheel(e) {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.15 : 1/1.15;
+  const zoom = Math.max(0.25, Math.min(6, drawState.viewZoom * factor));
+  const actual = zoom / drawState.viewZoom;
+  const rect = e.target.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  drawState.viewOffset.x = sx - (sx - drawState.viewOffset.x) * actual;
+  drawState.viewOffset.y = sy - (sy - drawState.viewOffset.y) * actual;
+  drawState.viewZoom = zoom;
+  renderCanvas();
+}
+
+function togglePanMode() {
+  drawState.panMode = !drawState.panMode;
+  const btn = document.getElementById('btn-pan-mode');
+  if (btn) btn.classList.toggle('active', drawState.panMode);
+  const c = document.getElementById('fence-canvas');
+  if (c) c.style.cursor = drawState.panMode ? 'grab' : '';
+}
+
+function resetView() {
+  drawState.viewOffset = { x: 0, y: 0 };
+  drawState.viewZoom   = 1.0;
+  renderCanvas();
 }
 function onCanvasHover(e) {
-  if (drawState.gateMode || drawState.closed) return;
+  if (drawState.gateMode || drawState.closed) {
+    hoverPt = null;
+    return;
+  }
   hoverPt = canvasPos(e, e.target);
   renderCanvas();
 }
@@ -2229,7 +2542,11 @@ function clearCanvas() {
   annotations = [];
   houseStart = null;
   activeAnnotationType = null;
+  _snapIndicator = null;
   document.querySelectorAll('.ann-btn').forEach(b => b.classList.remove('active'));
+  // Unlock scale label
+  const ftPerCell = drawState.gridFt;
+  document.getElementById('scale-label').textContent = `1 grid = ${ftPerCell} ft`;
   updateDrawHint();
   updateGateModeUI();
   updateGateOverridesPanel();
@@ -2238,7 +2555,13 @@ function clearCanvas() {
 
 function updateScale() {
   const v = parseInt(document.getElementById('scale-slider').value);
-  // v = 2..20, map to ft-per-cell: 2→50ft, 8→10ft, 20→5ft
+  if (drawState.points.length > 0) {
+    // Scale is locked once drawing starts — revert slider and warn
+    document.getElementById('scale-slider').value = drawState.scale;
+    document.getElementById('scale-label').textContent = `1 grid = ${drawState.gridFt} ft 🔒`;
+    showToast('Clear drawing first to change scale', true);
+    return;
+  }
   const ftPerCell = Math.round(60 / v);
   drawState.scale = v;
   drawState.gridFt = ftPerCell;
@@ -2370,211 +2693,241 @@ function rrect(ctx, x, y, w, h, r) {
 }
 
 // ── Render canvas ────────────────────────────────────────────
-function renderCanvas() {
+function renderCanvas(opts) {
   const canvas = document.getElementById('fence-canvas');
   if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
-  const ds = drawState;
-  const cell = ds.scale * ds.gridFt;
+  _renderToCtx(canvas.getContext('2d'), canvas.width / _dpr, canvas.height / _dpr, opts);
+}
 
-  ctx.clearRect(0, 0, W, H);
+function _renderToCtx(ctx, W, H, opts) {
+  // opts: { skipHover, exportMode } for PNG export
+  const ds   = drawState;
+  const vz   = ds.viewZoom;
+  const vo   = ds.viewOffset;
+  const cell = ds.scale * ds.gridFt;
+  const pW   = W * _dpr, pH = H * _dpr;
+
+  // Clear physical pixels
+  ctx.clearRect(0, 0, pW, pH);
+
+  // Scale for DPI — all subsequent drawing in CSS px
+  ctx.save();
+  ctx.scale(_dpr, _dpr);
 
   // Background
   ctx.fillStyle = '#f8faff';
   ctx.fillRect(0, 0, W, H);
 
+  // ── Viewport transform ─────────────────────────────────────
+  ctx.save();
+  ctx.translate(vo.x, vo.y);
+  ctx.scale(vz, vz);
+
+  // Visible world rect
+  const wx0 = -vo.x / vz, wy0 = -vo.y / vz;
+  const wxW = W / vz,      wxH = H / vz;
+
   // Grid
   ctx.strokeStyle = '#dde3f0';
-  ctx.lineWidth = 0.75;
-  for (let x = 0; x <= W; x += cell) {
-    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+  ctx.lineWidth = 0.75 / vz;
+  const gx0 = Math.floor(wx0 / cell) * cell;
+  const gy0 = Math.floor(wy0 / cell) * cell;
+  for (let x = gx0; x < wx0 + wxW + cell; x += cell) {
+    ctx.beginPath(); ctx.moveTo(x, gy0); ctx.lineTo(x, wy0 + wxH + cell); ctx.stroke();
   }
-  for (let y = 0; y <= H; y += cell) {
-    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  for (let y = gy0; y < wy0 + wxH + cell; y += cell) {
+    ctx.beginPath(); ctx.moveTo(gx0, y); ctx.lineTo(wx0 + wxW + cell, y); ctx.stroke();
   }
 
-  // Grid labels (ft)
+  // Grid labels
   ctx.fillStyle = '#9aa8c0';
-  ctx.font = '9px DM Sans, sans-serif';
-  for (let x = cell; x < W; x += cell) {
-    const ft = Math.round(x / ds.scale);
-    ctx.fillText(ft+"'", x+2, 11);
+  ctx.font = `${9 / vz}px DM Sans, sans-serif`;
+  for (let x = Math.ceil(wx0 / cell) * cell; x < wx0 + wxW; x += cell) {
+    if (x <= 0) continue;
+    ctx.fillText(Math.round(x / ds.scale) + "'", x + 2/vz, wy0 + 11/vz);
   }
-  for (let y = cell; y < H; y += cell) {
-    const ft = Math.round(y / ds.scale);
-    ctx.fillText(ft+"'", 2, y-2);
-  }
-
-  if (ds.points.length === 0) return;
-
-  // Build segment list
-  const allPts = ds.closed
-    ? [...ds.points, ds.points[0]]
-    : ds.points;
-
-  // Draw segments
-  for (let i = 0; i < allPts.length - 1; i++) {
-    const a = allPts[i], b = allPts[i+1];
-    const isGate = ds.gateSegs.has(i);
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    if (isGate) {
-      ctx.strokeStyle = '#e8a020';
-      ctx.lineWidth = 3;
-      ctx.setLineDash([6,5]);
-    } else {
-      ctx.strokeStyle = '#13245a';
-      ctx.lineWidth = 3;
-      ctx.setLineDash([]);
-    }
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Length label
-    const mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
-    const measuredFt = Math.round(Math.hypot(b.x-a.x, b.y-a.y) / ds.scale * 2)/2;
-    const ft = isGate ? (ds.gateOverrides.get(i) ?? measuredFt) : measuredFt;
-    const dx = b.x-a.x, dy = b.y-a.y;
-    const len = Math.hypot(dx,dy)||1;
-    // Offset label perpendicular to segment
-    const ox = -dy/len*14, oy = dx/len*14;
-    ctx.save();
-    ctx.fillStyle = isGate ? '#c87800' : '#13245a';
-    ctx.font = `bold 10px DM Sans, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    // White bg pill
-    const label = isGate ? `🚪 ${ft}'` : `${ft}'`;
-    const tw = ctx.measureText(label).width + 8;
-    ctx.fillStyle = 'rgba(255,255,255,0.88)';
-    ctx.beginPath();
-    rrect(ctx, mx+ox-tw/2, my+oy-7, tw, 14, 4);
-    ctx.fill();
-    ctx.fillStyle = isGate ? '#c87800' : '#13245a';
-    ctx.fillText(label, mx+ox, my+oy);
-    ctx.restore();
+  for (let y = Math.ceil(wy0 / cell) * cell; y < wy0 + wxH; y += cell) {
+    if (y <= 0) continue;
+    ctx.fillText(Math.round(y / ds.scale) + "'", wx0 + 2/vz, y - 2/vz);
   }
 
-  // Draw hover preview line + live length label
-  if (!ds.closed && hoverPt && ds.points.length > 0 && !activeAnnotationType) {
-    const last = ds.points[ds.points.length-1];
-    ctx.beginPath();
-    ctx.moveTo(last.x, last.y);
-    ctx.lineTo(hoverPt.x, hoverPt.y);
-    ctx.strokeStyle = 'rgba(126,183,5,0.7)';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([4,4]);
-    ctx.stroke();
-    ctx.setLineDash([]);
+  if (ds.points.length > 0) {
+    const allPts = ds.closed ? [...ds.points, ds.points[0]] : ds.points;
 
-    // Live length label
-    const previewFt = Math.round(Math.hypot(hoverPt.x-last.x, hoverPt.y-last.y) / ds.scale * 2) / 2;
-    if (previewFt > 0) {
-      const mx = (last.x + hoverPt.x) / 2, my = (last.y + hoverPt.y) / 2;
-      const label = previewFt + "'";
+    // Segments
+    for (let i = 0; i < allPts.length - 1; i++) {
+      const a = allPts[i], b = allPts[i+1];
+      const isGate = ds.gateSegs.has(i);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+      if (isGate) {
+        ctx.strokeStyle = '#e8a020'; ctx.lineWidth = 3/vz; ctx.setLineDash([6/vz, 5/vz]);
+      } else {
+        ctx.strokeStyle = '#13245a'; ctx.lineWidth = 3/vz; ctx.setLineDash([]);
+      }
+      ctx.stroke(); ctx.setLineDash([]);
+
+      // Length label
+      const mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
+      const measuredFt = Math.round(Math.hypot(b.x-a.x, b.y-a.y) / ds.scale * 2) / 2;
+      const ft = isGate ? (ds.gateOverrides.get(i) ?? measuredFt) : measuredFt;
+      const dx = b.x-a.x, dy = b.y-a.y, len = Math.hypot(dx,dy)||1;
+      const ox = -dy/len * 14/vz, oy = dx/len * 14/vz;
       ctx.save();
-      ctx.font = 'bold 11px DM Sans, sans-serif';
+      ctx.font = `bold ${10/vz}px DM Sans, sans-serif`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      const tw = ctx.measureText(label).width + 10;
-      ctx.fillStyle = 'rgba(126,183,5,0.92)';
-      ctx.beginPath(); rrect(ctx, mx-tw/2, my-9, tw, 18, 5); ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.fillText(label, mx, my);
+      const label = isGate ? `🚪 ${ft}'` : `${ft}'`;
+      const tw = ctx.measureText(label).width + 8/vz;
+      ctx.fillStyle = 'rgba(255,255,255,0.88)';
+      ctx.beginPath(); rrect(ctx, mx+ox-tw/2, my+oy-7/vz, tw, 14/vz, 4/vz); ctx.fill();
+      ctx.fillStyle = isGate ? '#c87800' : '#13245a';
+      ctx.fillText(label, mx+ox, my+oy);
       ctx.restore();
     }
+
+    // Hover preview line (skip in export mode)
+    if (!opts?.skipHover && !ds.closed && hoverPt && ds.points.length > 0 && !activeAnnotationType) {
+      const last = ds.points[ds.points.length-1];
+      ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(hoverPt.x, hoverPt.y);
+      ctx.strokeStyle = 'rgba(126,183,5,0.7)'; ctx.lineWidth = 2/vz;
+      ctx.setLineDash([4/vz, 4/vz]); ctx.stroke(); ctx.setLineDash([]);
+      const previewFt = Math.round(Math.hypot(hoverPt.x-last.x, hoverPt.y-last.y) / ds.scale * 2) / 2;
+      if (previewFt > 0) {
+        const pmx = (last.x+hoverPt.x)/2, pmy = (last.y+hoverPt.y)/2;
+        const plabel = previewFt + "'";
+        ctx.save();
+        ctx.font = `bold ${11/vz}px DM Sans, sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const ptw = ctx.measureText(plabel).width + 10/vz;
+        ctx.fillStyle = 'rgba(126,183,5,0.92)';
+        ctx.beginPath(); rrect(ctx, pmx-ptw/2, pmy-9/vz, ptw, 18/vz, 5/vz); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.fillText(plabel, pmx, pmy);
+        ctx.restore();
+      }
+    }
+
+    // Close-point indicator
+    if (!ds.closed && ds.points.length >= 3 && hoverPt) {
+      const first = ds.points[0];
+      if (Math.hypot(hoverPt.x - first.x, hoverPt.y - first.y) < MIN_CLOSE_DIST) {
+        ctx.beginPath(); ctx.arc(first.x, first.y, 12/vz, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(126,183,5,0.8)'; ctx.lineWidth = 2/vz;
+        ctx.setLineDash([3/vz, 3/vz]); ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+
+    // Draw points
+    ds.points.forEach((pt, i) => {
+      const isFirst = i === 0;
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, (isFirst ? 8 : 5)/vz, 0, Math.PI*2);
+      ctx.fillStyle = isFirst ? '#7eb705' : '#13245a'; ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2/vz; ctx.stroke();
+      if (isFirst) {
+        ctx.fillStyle = '#fff'; ctx.font = `bold ${8/vz}px sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('●', pt.x, pt.y);
+      }
+    });
   }
 
-  // House rectangle preview (first corner placed, dragging second)
-  if (activeAnnotationType === 'house' && houseStart && hoverPt) {
+  // Structure preview (first-corner placed, before second click)
+  if (!opts?.skipHover && activeAnnotationType === 'house' && houseStart) {
     ctx.save();
-    ctx.strokeStyle = '#c87800';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5,4]);
-    ctx.strokeRect(houseStart.x, houseStart.y, hoverPt.x - houseStart.x, hoverPt.y - houseStart.y);
-    ctx.setLineDash([]);
-    ctx.fillStyle = 'rgba(200,120,0,0.1)';
-    ctx.fillRect(houseStart.x, houseStart.y, hoverPt.x - houseStart.x, hoverPt.y - houseStart.y);
+    ctx.beginPath(); ctx.arc(houseStart.x, houseStart.y, 5/vz, 0, Math.PI*2);
+    ctx.fillStyle = '#c87800'; ctx.fill();
+    if (hoverPt) {
+      const rx = Math.min(houseStart.x, hoverPt.x), ry = Math.min(houseStart.y, hoverPt.y);
+      const rw = Math.abs(hoverPt.x - houseStart.x), rh = Math.abs(hoverPt.y - houseStart.y);
+      ctx.strokeStyle = '#c87800'; ctx.lineWidth = 2/vz;
+      ctx.setLineDash([5/vz, 4/vz]); ctx.fillStyle = 'rgba(200,120,0,0.10)';
+      ctx.fillRect(rx, ry, rw, rh); ctx.strokeRect(rx, ry, rw, rh); ctx.setLineDash([]);
+      if (rw > 20/vz && rh > 14/vz) {
+        const wFt = (rw/ds.scale).toFixed(1), hFt = (rh/ds.scale).toFixed(1);
+        ctx.font = `bold ${10/vz}px DM Sans, sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const dlab = `${wFt}' × ${hFt}'`;
+        const dtw = ctx.measureText(dlab).width + 8/vz;
+        ctx.fillStyle = 'rgba(255,255,255,0.88)';
+        ctx.beginPath(); rrect(ctx, rx+rw/2-dtw/2, ry+rh/2-8/vz, dtw, 16/vz, 4/vz); ctx.fill();
+        ctx.fillStyle = '#c87800'; ctx.fillText(dlab, rx+rw/2, ry+rh/2);
+      }
+    }
     ctx.restore();
   }
 
-  // Draw points
-  ds.points.forEach((pt, i) => {
-    const isFirst = i === 0;
-    const isLast  = i === ds.points.length - 1;
-    ctx.beginPath();
-    ctx.arc(pt.x, pt.y, isFirst ? 8 : 5, 0, Math.PI*2);
-    ctx.fillStyle = isFirst ? '#7eb705' : '#13245a';
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    // Label first point
-    if (isFirst) {
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 8px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('●', pt.x, pt.y);
+  // Annotations
+  const annIcons = { tree: '🌳', structure: '▪', gate: '⛩' };
+  annotations.forEach(ann => {
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (ann.type === 'house') {
+      ctx.strokeStyle = '#c87800'; ctx.lineWidth = 2/vz;
+      ctx.fillStyle = 'rgba(200,120,0,0.12)';
+      ctx.fillRect(ann.x, ann.y, ann.w, ann.h);
+      ctx.strokeRect(ann.x, ann.y, ann.w, ann.h);
+      ctx.font = `bold ${10/vz}px DM Sans, sans-serif`;
+      ctx.fillStyle = '#c87800';
+      ctx.fillText('⬛ Structure', ann.x + ann.w/2, ann.y + ann.h/2);
+    } else if (ann.type === 'good') {
+      ctx.translate(ann.x, ann.y); ctx.rotate(ann.angle || 0);
+      ctx.font = `bold ${22/vz}px sans-serif`; ctx.fillStyle = '#1a7a3a';
+      ctx.fillText('↑', 0, 0);
+      ctx.font = `bold ${9/vz}px DM Sans, sans-serif`;
+      ctx.fillText('GOOD SIDE', 0, 14/vz);
+    } else {
+      ctx.font = `${20/vz}px serif`;
+      ctx.fillText(annIcons[ann.type] || '📍', ann.x, ann.y);
+      if (ann.type === 'note' && ann.label) {
+        ctx.font = `bold ${10/vz}px DM Sans, sans-serif`;
+        const noteW = ctx.measureText(ann.label).width + 8/vz;
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.beginPath(); rrect(ctx, ann.x - noteW/2, ann.y + 12/vz, noteW, 14/vz, 3/vz); ctx.fill();
+        ctx.fillStyle = '#13245a';
+        ctx.fillText(ann.label, ann.x, ann.y + 19/vz);
+      }
     }
+    ctx.restore();
   });
 
-  // Total footage label
+  // Snap indicator
+  if (_snapIndicator) {
+    ctx.save();
+    ctx.beginPath(); ctx.arc(_snapIndicator.x, _snapIndicator.y, 7/vz, 0, Math.PI*2);
+    ctx.strokeStyle = '#7eb705'; ctx.lineWidth = 2/vz; ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.restore(); // ── end viewport transform ──
+
+  // ── Fixed UI overlay (no viewport) ──
   if (ds.points.length >= 2) {
     const totalFt = calcTotalDrawFt();
-    ctx.fillStyle = 'rgba(19,36,90,0.85)';
-    ctx.font = 'bold 11px DM Sans, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
     const totalLabel = `Total: ${totalFt} ft`;
+    ctx.save();
+    ctx.font = 'bold 11px DM Sans, sans-serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
     const tw = ctx.measureText(totalLabel).width + 12;
     ctx.fillStyle = 'rgba(255,255,255,0.92)';
     ctx.beginPath(); rrect(ctx, W-tw-6, H-22, tw, 18, 4); ctx.fill();
     ctx.fillStyle = '#13245a';
     ctx.fillText(totalLabel, W-tw-1, H-19);
+    ctx.restore();
   }
 
-  // Draw annotations
-  const annIcons = { tree: '🌳', structure: '▪', gate: '⛩' };
-  annotations.forEach(ann => {
+  // Zoom level indicator (when not 100%)
+  if (Math.abs(vz - 1) > 0.05) {
     ctx.save();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    if (ann.type === 'house') {
-      // Draw rectangle
-      ctx.strokeStyle = '#c87800';
-      ctx.lineWidth = 2;
-      ctx.fillStyle = 'rgba(200,120,0,0.12)';
-      ctx.fillRect(ann.x, ann.y, ann.w, ann.h);
-      ctx.strokeRect(ann.x, ann.y, ann.w, ann.h);
-      // Label
-      ctx.font = 'bold 10px DM Sans, sans-serif';
-      ctx.fillStyle = '#c87800';
-      ctx.fillText('🏠 House', ann.x + ann.w/2, ann.y + ann.h/2);
-    } else if (ann.type === 'good') {
-      ctx.translate(ann.x, ann.y);
-      ctx.rotate(ann.angle || 0);
-      ctx.font = 'bold 22px sans-serif';
-      ctx.fillStyle = '#1a7a3a';
-      ctx.fillText('↑', 0, 0);
-      ctx.font = 'bold 9px DM Sans, sans-serif';
-      ctx.fillText('GOOD SIDE', 0, 14);
-    } else {
-      ctx.font = '20px serif';
-      ctx.fillText(annIcons[ann.type] || '📍', ann.x, ann.y);
-      if (ann.type === 'note' && ann.label) {
-        ctx.font = 'bold 10px DM Sans, sans-serif';
-        const noteW = ctx.measureText(ann.label).width + 8;
-        ctx.fillStyle = 'rgba(255,255,255,0.9)';
-        ctx.beginPath(); rrect(ctx, ann.x - noteW/2, ann.y + 12, noteW, 14, 3); ctx.fill();
-        ctx.fillStyle = '#13245a';
-        ctx.fillText(ann.label, ann.x, ann.y + 19);
-      }
-    }
+    ctx.font = 'bold 10px DM Sans, sans-serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    const zLabel = Math.round(vz * 100) + '%';
+    const ztw = ctx.measureText(zLabel).width + 8;
+    ctx.fillStyle = 'rgba(19,36,90,0.65)';
+    ctx.beginPath(); rrect(ctx, 6, H-22, ztw, 16, 4); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fillText(zLabel, 10, H-20);
     ctx.restore();
-  });
+  }
+
+  ctx.restore(); // ── end DPI scale ──
 }
 
 function calcTotalDrawFt() {
@@ -3226,8 +3579,12 @@ async function submitBOM(){
     clearTimeout(timer);
     const json = await res.json();
     if(json.ok){
-      // Save to Firestore
-      await saveJobToFirestore(payload, json.jobId || ('HW-' + Date.now()), sketchUrl);
+      // Save to Firestore (non-blocking — Sheet log is source of truth)
+      try {
+        await saveJobToFirestore(payload, json.jobId || ('HW-' + Date.now()), sketchUrl);
+      } catch(fsErr) {
+        console.warn('Firestore save failed (non-critical):', fsErr);
+      }
 
       document.getElementById('modal-overlay').classList.remove('open');
       showToast(`✓ BOM submitted for ${branchName} — job logged`);
@@ -3298,15 +3655,16 @@ function openSupplierQuote() {
   const bom = buildBOM();
   if (!bom.length) { showToast('Complete a quote first', true); return; }
 
-  const prod = getProduct();
-  const branch = document.getElementById('branch-select').selectedOptions[0]?.text || '';
-  const posts = countPosts();
+  const prod    = getProduct();
+  const branch  = document.getElementById('branch-select').selectedOptions[0]?.text || '';
+  const address = (document.getElementById('inp-address')?.value || document.getElementById('customer-address')?.value || '').trim();
+  const posts   = countPosts();
 
-  // Header info
-  document.getElementById('supplier-sub').textContent =
-    `${branch} · ${state.mat.charAt(0).toUpperCase()+state.mat.slice(1)} ${prod?.product_name||''} · ${state.height} · ${posts.lf} ft`;
+  // Header: address first if available
+  const parts = [address, branch, `${state.mat.charAt(0).toUpperCase()+state.mat.slice(1)} ${prod?.product_name||''}`.trim(), state.height, `${posts.lf} ft`].filter(Boolean);
+  document.getElementById('supplier-sub').textContent = parts.join(' · ');
 
-  // Group by category, strip costs
+  // Group by category — Item + Qty only (no costs, no supplier)
   const byCategory = {};
   bom.forEach(it => {
     if (!byCategory[it.category]) byCategory[it.category] = [];
@@ -3320,9 +3678,8 @@ function openSupplierQuote() {
       <table style="width:100%;border-collapse:collapse;font-size:.83rem;">`;
     items.forEach(it => {
       html += `<tr>
-        <td style="padding:3px 6px 3px 0;width:55%;">${it.description}</td>
-        <td style="padding:3px 6px;text-align:right;font-weight:700;white-space:nowrap;">${it.qty} ${it.unit}</td>
-        <td style="padding:3px 0 3px 6px;color:var(--mid);font-size:.75rem;">${it.supplier||''}</td>
+        <td style="padding:3px 6px 3px 0;">${it.description}</td>
+        <td style="padding:3px 0;text-align:right;font-weight:700;white-space:nowrap;">${it.qty} ${it.unit}</td>
       </tr>`;
     });
     html += '</table></div>';
@@ -3338,13 +3695,15 @@ function closeSupplierModal(e) {
 }
 
 function copySupplierList() {
-  const bom = buildBOM();
-  const prod = getProduct();
-  const branch = document.getElementById('branch-select').selectedOptions[0]?.text || '';
-  const posts = countPosts();
+  const bom     = buildBOM();
+  const prod    = getProduct();
+  const branch  = document.getElementById('branch-select').selectedOptions[0]?.text || '';
+  const address = (document.getElementById('inp-address')?.value || document.getElementById('customer-address')?.value || '').trim();
+  const posts   = countPosts();
+  const parts   = [address, branch, `${state.mat} ${prod?.product_name||''}`.trim(), state.height, `${posts.lf} ft`].filter(Boolean);
   let lines = [
     `HEARTWOOD FENCE — MATERIAL LIST`,
-    `${branch} · ${state.mat} ${prod?.product_name||''} · ${state.height} · ${posts.lf} ft`,
+    parts.join(' · '),
     `Generated: ${new Date().toLocaleDateString()}`,
     '',
   ];
@@ -3352,7 +3711,7 @@ function copySupplierList() {
   bom.forEach(it => { if (!byCategory[it.category]) byCategory[it.category] = []; byCategory[it.category].push(it); });
   Object.entries(byCategory).forEach(([cat, items]) => {
     lines.push(cat.toUpperCase());
-    items.forEach(it => lines.push(`  ${it.qty} ${it.unit}  ${it.description}${it.supplier ? '  [' + it.supplier + ']' : ''}`));
+    items.forEach(it => lines.push(`  ${it.qty} ${it.unit}  ${it.description}`));
     lines.push('');
   });
   navigator.clipboard.writeText(lines.join('\n'))
@@ -3361,28 +3720,30 @@ function copySupplierList() {
 }
 
 function printSupplierList() {
-  const prod = getProduct();
-  const branch = document.getElementById('branch-select').selectedOptions[0]?.text || '';
-  const posts = countPosts();
-  const bom = buildBOM();
+  const prod    = getProduct();
+  const branch  = document.getElementById('branch-select').selectedOptions[0]?.text || '';
+  const address = (document.getElementById('inp-address')?.value || document.getElementById('customer-address')?.value || '').trim();
+  const posts   = countPosts();
+  const bom     = buildBOM();
+  const parts   = [address, branch, `${state.mat} ${prod?.product_name||''}`.trim(), state.height, `${posts.lf} ft`].filter(Boolean);
   const byCategory = {};
   bom.forEach(it => { if (!byCategory[it.category]) byCategory[it.category] = []; byCategory[it.category].push(it); });
 
   let rows = '';
   Object.entries(byCategory).forEach(([cat, items]) => {
-    rows += `<tr><td colspan="3" style="background:#e8f0ff;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.08em;padding:6px 8px;">${cat}</td></tr>`;
+    rows += `<tr><td colspan="2" style="background:#e8f0ff;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.08em;padding:6px 8px;">${cat}</td></tr>`;
     items.forEach(it => {
-      rows += `<tr><td style="padding:4px 8px;">${it.description}</td><td style="padding:4px 8px;text-align:right;font-weight:700;">${it.qty} ${it.unit}</td><td style="padding:4px 8px;color:#666;">${it.supplier||''}</td></tr>`;
+      rows += `<tr><td style="padding:4px 8px;">${it.description}</td><td style="padding:4px 8px;text-align:right;font-weight:700;white-space:nowrap;">${it.qty} ${it.unit}</td></tr>`;
     });
   });
 
   const w = window.open('', '_blank');
   w.document.write(`<!DOCTYPE html><html><head><title>Heartwood Material List</title>
   <style>body{font-family:Arial,sans-serif;font-size:13px;margin:24px}h2{color:#13245a;margin-bottom:4px}p{color:#666;margin:0 0 16px}table{width:100%;border-collapse:collapse}th{background:#13245a;color:#fff;padding:6px 8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em}tr:nth-child(even){background:#f7f9ff}@media print{button{display:none}}</style></head>
-  <body><h2>Heartwood Fence — Supplier Material List</h2>
-  <p>${branch} &nbsp;·&nbsp; ${state.mat} ${prod?.product_name||''} &nbsp;·&nbsp; ${state.height} &nbsp;·&nbsp; ${posts.lf} ft &nbsp;·&nbsp; ${new Date().toLocaleDateString()}</p>
-  <table><thead><tr><th>Item</th><th style="text-align:right">Qty</th><th>Supplier</th></tr></thead><tbody>${rows}</tbody></table>
-  <p style="margin-top:20px;font-size:11px;color:#999;">Please quote all items. Contact us with any questions or substitutions.</p>
+  <body><h2>Heartwood Fence — Material List</h2>
+  <p>${parts.join(' &nbsp;·&nbsp; ')} &nbsp;·&nbsp; ${new Date().toLocaleDateString()}</p>
+  <table><thead><tr><th>Item</th><th style="text-align:right">Qty</th></tr></thead><tbody>${rows}</tbody></table>
+  <p style="margin-top:20px;font-size:11px;color:#999;">Please quote all items listed. Contact us with any questions or substitutions.</p>
   <script>window.print();<\/script></body></html>`);
   w.document.close();
 }
