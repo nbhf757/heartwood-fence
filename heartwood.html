@@ -351,24 +351,24 @@
   /* ── Sold-at box (permanent in quote card) ── */
   .sold-at-box {
     margin: 12px 0 10px;
-    background: rgba(255,255,255,0.07); border-radius: 8px;
-    padding: 10px 12px; border: 1.5px solid rgba(126,183,5,0.3);
+    background: rgba(255,255,255,0.12); border-radius: 8px;
+    padding: 10px 12px; border: 2px solid rgba(126,183,5,0.55);
   }
-  .sold-at-box .plabel { margin-bottom: 5px; }
+  .sold-at-box .plabel { margin-bottom: 5px; color: #c8e87a; font-weight: 700; font-size: 0.8rem; letter-spacing: .05em; }
   .sold-at-input-row { display: flex; align-items: center; gap: 0; }
   .sold-at-dollar {
-    background: rgba(255,255,255,0.1); border: 1.5px solid rgba(255,255,255,0.18);
+    background: rgba(126,183,5,0.25); border: 2px solid rgba(126,183,5,0.5);
     border-right: none; border-radius: 6px 0 0 6px;
-    padding: 6px 9px; font-weight: 700; color: rgba(255,255,255,0.6); font-size: 0.95rem;
+    padding: 8px 11px; font-weight: 700; color: #c8e87a; font-size: 1.05rem;
   }
   .sold-at-input-row input {
-    flex: 1; background: rgba(255,255,255,0.1); border: 1.5px solid rgba(255,255,255,0.18);
-    border-radius: 0 6px 6px 0; padding: 6px 10px;
-    font-size: 1.05rem; font-weight: 700; color: #fff; font-family: inherit;
+    flex: 1; background: rgba(255,255,255,0.15); border: 2px solid rgba(126,183,5,0.5);
+    border-radius: 0 6px 6px 0; padding: 8px 10px;
+    font-size: 1.15rem; font-weight: 700; color: #fff; font-family: inherit;
     min-width: 0;
   }
-  .sold-at-input-row input::placeholder { color: rgba(255,255,255,0.3); font-weight: 400; }
-  .sold-at-input-row input:focus { outline: none; border-color: var(--green); }
+  .sold-at-input-row input::placeholder { color: rgba(255,255,255,0.5); font-weight: 400; font-size: 0.9rem; }
+  .sold-at-input-row input:focus { outline: none; border-color: var(--green); background: rgba(255,255,255,0.2); }
   .sold-at-hint { font-size: 0.7rem; margin-top: 5px; min-height: 14px; }
   .sold-at-hint.ok   { color: #b8e060; }
   .sold-at-hint.warn { color: #f0c040; }
@@ -684,12 +684,13 @@ function _applyRoleUI() {
     const sheetLink = document.getElementById('admin-sheet-link');
     const panelLink = document.getElementById('admin-panel-link');
     if (sheetLink) sheetLink.href = 'https://docs.google.com/spreadsheets/d/1jcRvb30Cityh30xbHaa7RJsZ_uN9Iok3KrDFfEIHOnc/edit';
-    if (panelLink && APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') panelLink.href = APPS_SCRIPT_URL;
+    // Guard against APPS_SCRIPT_URL not yet defined (bottom-of-body script)
+    try { if (panelLink && typeof APPS_SCRIPT_URL !== 'undefined') panelLink.href = APPS_SCRIPT_URL; } catch(e) {}
   }
 
   // Show dashboard tab for admins and owners
   const dashTab = document.getElementById('tab-dashboard');
-  if (dashTab) dashTab.style.display = (userRole === 'admin' || userRole === 'owner') ? '' : 'none';
+  if (dashTab) dashTab.style.display = (userRole === 'admin' || userRole === 'owner') ? 'inline-block' : 'none';
 
   const userInfoEls = document.querySelectorAll('.user-info-area');
   userInfoEls.forEach(el => {
@@ -1141,12 +1142,12 @@ function _applyRoleUI() {
     </div>
 
     <div class="modal-field">
-      <label>Customer Name *</label>
-      <input type="text" id="inp-customer" placeholder="e.g. John Smith" oninput="validateModal()">
+      <label>Customer Name</label>
+      <input type="text" id="inp-customer" placeholder="e.g. John Smith (optional)">
     </div>
     <div class="modal-field">
-      <label>Property Address *</label>
-      <input type="text" id="inp-address" placeholder="e.g. 123 Main St, Virginia Beach, VA">
+      <label>Property Address</label>
+      <input type="text" id="inp-address" placeholder="e.g. 123 Main St, Virginia Beach, VA (optional)">
     </div>
     <div class="modal-field">
       <label>Salesperson Name *</label>
@@ -2549,6 +2550,8 @@ function initApp() {
   renderProducts(); renderHeights(); renderAddons();
   addSegment(); addSegment();
   loadBranch('VB');
+  // Re-apply role UI now that APPS_SCRIPT_URL is defined and DOM is fully ready
+  _applyRoleUI();
 }
 
 // When Firebase is not configured (dev mode), initApp is called via DOMContentLoaded bypass above.
@@ -2736,6 +2739,14 @@ function openModal(){
   const soldAtVal = parseFloat(document.getElementById('sold-at-input')?.value) || 0;
   document.getElementById('inp-sold-price').value = soldAtVal > 0 ? soldAtVal : Math.round(_lastCalc.sell);
   onSoldPriceInput();
+
+  // Auto-fill salesperson with logged-in user's name (only if empty)
+  const spEl = document.getElementById('inp-salesperson');
+  if (spEl && !spEl.value.trim() && currentUser) {
+    spEl.value = currentUser.displayName || currentUser.email.split('@')[0];
+  }
+
+  validateModal();
   document.getElementById('modal-overlay').classList.add('open');
   setTimeout(()=>document.getElementById('inp-customer').focus(), 250);
 }
@@ -2771,10 +2782,8 @@ function onSoldPriceInput(){
 }
 
 function validateModal(){
-  const ok = document.getElementById('inp-customer').value.trim() &&
-             document.getElementById('inp-address').value.trim() &&
-             document.getElementById('inp-salesperson').value.trim() &&
-             (parseFloat(document.getElementById('inp-sold-price').value)||0) > 0;
+  // Only sold price is required; customer/address/notes are optional
+  const ok = (parseFloat(document.getElementById('inp-sold-price').value)||0) > 0;
   document.getElementById('modal-submit-btn').disabled = !ok;
 }
 
