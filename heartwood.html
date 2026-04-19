@@ -518,12 +518,12 @@
 // ── Firebase config — paste values from Firebase Console ──────
 // Project Settings → Your Apps → Web app → SDK setup and configuration
 const FIREBASE_CONFIG = {
-  apiKey:            "YOUR_FIREBASE_API_KEY",
-  authDomain:        "YOUR_FIREBASE_AUTH_DOMAIN",
-  projectId:         "YOUR_FIREBASE_PROJECT_ID",
-  storageBucket:     "YOUR_FIREBASE_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_FIREBASE_MESSAGING_SENDER_ID",
-  appId:             "YOUR_FIREBASE_APP_ID"
+  apiKey:            "AIzaSyDjBM2UdWlNb_1adUdXyxcF43EYF05IJx0",
+  authDomain:        "heartwood-quote.firebaseapp.com",
+  projectId:         "heartwood-quote",
+  storageBucket:     "heartwood-quote.firebasestorage.app",
+  messagingSenderId: "876777205707",
+  appId:             "1:876777205707:web:0b83a7e9cc2cad40da904e"
 };
 const AUTH_DOMAIN    = 'heartwoodfenceva.com';
 const ADMIN_EMAILS   = ['fadi@heartwoodfenceva.com', 'nathan@heartwoodfenceva.com'];
@@ -596,7 +596,7 @@ function _applyRoleUI() {
     const sheetLink = document.getElementById('admin-sheet-link');
     const panelLink = document.getElementById('admin-panel-link');
     // ▼▼ Replace YOUR_SPREADSHEET_ID with the actual Spreadsheet ID ▼▼
-    if (sheetLink) sheetLink.href = 'https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit';
+    if (sheetLink) sheetLink.href = 'https://docs.google.com/spreadsheets/d/1jcRvb30Cityh30xbHaa7RJsZ_uN9Iok3KrDFfEIHOnc/edit';
     if (panelLink && APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') panelLink.href = APPS_SCRIPT_URL;
   }
 
@@ -674,8 +674,8 @@ function _applyRoleUI() {
   <select class="branch-select" id="branch-select" onchange="loadBranch(this.value)">
     <option value="VB">Virginia Beach</option>
     <option value="CIN">Cincinnati</option>
-    <option value="GVL">Greenville</option>
-    <option value="BOI">Boise</option>
+    <option value="GRV">Greenville</option>
+    <option value="BSE">Boise</option>
   </select>
   <div class="status-pill" id="status-pill">
     <div class="spinner" id="status-spinner"></div>
@@ -1071,7 +1071,7 @@ function _applyRoleUI() {
 //  ▼▼ PASTE YOUR APPS SCRIPT DEPLOYMENT URL HERE ▼▼
 //  (Extensions → Apps Script → Deploy → Web App URL)
 // ═══════════════════════════════════════════════════════════
-const APPS_SCRIPT_URL = "YOUR_APPS_SCRIPT_URL_HERE";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzAEXFMWVLS2_yjn_f1f5axZFW9ZAOTIS55KifyF7p-fymuQb6z6zcibNioxzqY3pI/exec";
 
 // ── Fallback pricing (Virginia Beach defaults) ─────────────
 const FALLBACK = {

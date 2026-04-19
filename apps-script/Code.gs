@@ -11,14 +11,14 @@
 //   const APPS_SCRIPT_URL = "https://script.google.com/macros/s/YOUR_ID/exec";
 //
 // SHEET SETUP: Create a Google Sheet with 4 tabs:
-//   Tab 1: Pricing  — Key | Default | VB | CIN | GVL | BOI | Description
+//   Tab 1: Pricing  — Key | Default | VB | CIN | GRV | BSE | Description
 //   Tab 2: Products — branch | product_id | product_name | material | ... (see SETUP.md)
 //   Tab 3: Addons   — product_id | addon_key | addon_label | cost_type | cost_value | supplier | notes
 //   Tab 4: Jobs     — auto-populated by BOM submissions
 // ─────────────────────────────────────────────────────────────────
 
 // ── Config ────────────────────────────────────────────────────────
-const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE'; // paste Spreadsheet ID from Google Sheets URL
+const SPREADSHEET_ID = '1jcRvb30Cityh30xbHaa7RJsZ_uN9Iok3KrDFfEIHOnc';
 const ALLOWED_DOMAIN = 'heartwoodfenceva.com';
 const ADMIN_EMAILS   = ['fadi@heartwoodfenceva.com', 'nathan@heartwoodfenceva.com'];
 const SHEET_PRICING  = 'Pricing';
@@ -68,7 +68,7 @@ function getPricing(branch) {
     if (!sheet) return jsonResponse({ ok: false, error: 'Pricing sheet not found' });
 
     const data    = sheet.getDataRange().getValues();
-    const headers = data[0]; // Row 1: Key | Default | VB | CIN | GVL | BOI | Description
+    const headers = data[0]; // Row 1: Key | Default | VB | CIN | GRV | BSE | Description
 
     const branchCol  = headers.indexOf(branch);
     const defaultCol = headers.indexOf('Default');
