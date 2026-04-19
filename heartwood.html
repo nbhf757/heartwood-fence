@@ -510,8 +510,134 @@
     .gates-grid, .addon-grid, .extras-row { grid-template-columns: 1fr; }
   }
 </style>
+
+<!-- ── Firebase Auth ─────────────────────────────────────────── -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script>
+// ── Firebase config — paste values from Firebase Console ──────
+// Project Settings → Your Apps → Web app → SDK setup and configuration
+const FIREBASE_CONFIG = {
+  apiKey:            "YOUR_FIREBASE_API_KEY",
+  authDomain:        "YOUR_FIREBASE_AUTH_DOMAIN",
+  projectId:         "YOUR_FIREBASE_PROJECT_ID",
+  storageBucket:     "YOUR_FIREBASE_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_FIREBASE_MESSAGING_SENDER_ID",
+  appId:             "YOUR_FIREBASE_APP_ID"
+};
+const AUTH_DOMAIN    = 'heartwoodfenceva.com';
+const ADMIN_EMAILS   = ['fadi@heartwoodfenceva.com', 'nathan@heartwoodfenceva.com'];
+
+let currentUser = null;
+let isAdmin     = false;
+let _firebaseReady = false;
+
+// Only initialize if config has been filled in
+if (FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_FIREBASE_API_KEY') {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  const _auth     = firebase.auth();
+  const _provider = new firebase.auth.GoogleAuthProvider();
+  _provider.setCustomParameters({ hd: AUTH_DOMAIN, prompt: 'select_account' });
+  _firebaseReady = true;
+
+  _auth.onAuthStateChanged(user => {
+    if (user) {
+      const domain = (user.email || '').split('@')[1] || '';
+      if (domain !== AUTH_DOMAIN) {
+        _auth.signOut();
+        _showAuthError(`Access is restricted to @${AUTH_DOMAIN} accounts. You signed in as ${user.email}.`);
+        return;
+      }
+      currentUser = user;
+      isAdmin     = ADMIN_EMAILS.includes(user.email.toLowerCase());
+      document.getElementById('auth-overlay').style.display = 'none';
+      document.getElementById('app-container').style.display = 'block';
+      _applyRoleUI();
+      if (typeof initApp === 'function') initApp();
+    } else {
+      currentUser = null;
+      isAdmin     = false;
+      document.getElementById('auth-overlay').style.display = 'flex';
+      document.getElementById('app-container').style.display = 'none';
+    }
+  });
+
+  window._signIn = function() {
+    document.getElementById('auth-error').style.display = 'none';
+    _auth.signInWithPopup(_provider).catch(err => {
+      if (err.code === 'auth/popup-blocked') {
+        _auth.signInWithRedirect(_provider);
+      } else {
+        _showAuthError('Sign-in failed. Please try again.');
+      }
+    });
+  };
+  window._signOut = function() { _auth.signOut(); };
+} else {
+  // Firebase not configured — bypass auth (dev mode)
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('auth-overlay').style.display = 'none';
+    document.getElementById('app-container').style.display = 'block';
+  });
+  window._signIn  = function() {};
+  window._signOut = function() {};
+}
+
+function _showAuthError(msg) {
+  const el = document.getElementById('auth-error');
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+
+function _applyRoleUI() {
+  const adminBar = document.getElementById('admin-toolbar');
+  if (adminBar) {
+    adminBar.style.display = isAdmin ? 'flex' : 'none';
+    // Set admin links dynamically using the deployed Apps Script URL
+    const sheetLink = document.getElementById('admin-sheet-link');
+    const panelLink = document.getElementById('admin-panel-link');
+    // ▼▼ Replace YOUR_SPREADSHEET_ID with the actual Spreadsheet ID ▼▼
+    if (sheetLink) sheetLink.href = 'https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit';
+    if (panelLink && APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') panelLink.href = APPS_SCRIPT_URL;
+  }
+
+  const userInfoEls = document.querySelectorAll('.user-info-area');
+  userInfoEls.forEach(el => {
+    el.innerHTML = currentUser
+      ? `<span style="font-size:12px;opacity:.7;">${currentUser.email}</span>
+         <button onclick="_signOut()" style="margin-left:8px;padding:3px 10px;font-size:11px;border:1px solid rgba(255,255,255,0.3);border-radius:4px;cursor:pointer;background:transparent;color:white;">Sign Out</button>`
+      : '';
+  });
+}
+</script>
 </head>
 <body>
+
+<!-- ── Auth Overlay ──────────────────────────────────────────── -->
+<div id="auth-overlay" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#f7f5f0;">
+  <div style="background:white;border-radius:14px;padding:48px 40px;box-shadow:0 8px 40px rgba(19,36,90,0.14);text-align:center;max-width:400px;width:90%;">
+    <!-- Logo -->
+    <svg width="48" height="48" viewBox="0 0 38 38" fill="none" style="margin-bottom:20px">
+      <rect width="38" height="38" rx="7" fill="#13245a"/>
+      <rect x="6" y="7" width="3.5" height="22" rx="1.75" fill="#7eb705"/>
+      <rect x="13" y="7" width="3.5" height="22" rx="1.75" fill="#7eb705"/>
+      <rect x="20" y="7" width="3.5" height="22" rx="1.75" fill="#7eb705"/>
+      <rect x="27" y="7" width="3.5" height="22" rx="1.75" fill="#7eb705"/>
+      <rect x="4" y="14" width="30" height="3" rx="1.5" fill="white" opacity="0.85"/>
+      <rect x="4" y="21" width="30" height="3" rx="1.5" fill="white" opacity="0.85"/>
+    </svg>
+    <h2 style="margin:0 0 6px;font-size:20px;color:#13245a;font-family:'Playfair Display',serif;">Heartwood Fence</h2>
+    <p style="color:#5a6a8a;margin:0 0 8px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;">Quote Calculator</p>
+    <p style="color:#888;margin:0 0 32px;font-size:13px;">Sign in with your Heartwood Google account to continue.</p>
+    <button onclick="_signIn()" style="display:inline-flex;align-items:center;gap:10px;background:white;border:1px solid #dadce0;border-radius:6px;padding:10px 22px;font-size:14px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.08);font-family:'DM Sans',sans-serif;">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="height:18px;" alt="Google">
+      Sign in with Google
+    </button>
+    <p id="auth-error" style="color:#c62828;font-size:13px;margin-top:16px;display:none;"></p>
+  </div>
+</div>
+
+<!-- ── App Container (hidden until auth) ─────────────────────── -->
+<div id="app-container" style="display:none">
 
 <header>
   <div class="header-logo">
@@ -530,16 +656,26 @@
       <span>Sales Quote Calculator</span>
     </div>
   </div>
-  <div class="header-tag">For internal use only</div>
+  <div class="header-tag" style="display:flex;align-items:center;gap:16px;">
+    <span style="font-size:.7rem;color:rgba(255,255,255,.35);font-style:italic;letter-spacing:.04em;">For internal use only</span>
+    <div class="user-info-area" style="display:flex;align-items:center;gap:8px;"></div>
+  </div>
 </header>
+
+<!-- ── Admin Toolbar (admins only) ───────────────────────────── -->
+<div id="admin-toolbar" style="display:none;background:#0d1a40;color:white;padding:7px 20px;align-items:center;gap:18px;font-size:12px;border-bottom:1px solid rgba(126,183,5,0.3);">
+  <span style="font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.6;font-size:11px;">Admin</span>
+  <a id="admin-sheet-link" href="#" target="_blank" style="color:#b8e060;text-decoration:none;font-weight:600;">📊 Open Pricing Sheet</a>
+  <a id="admin-panel-link" href="#" target="_blank" style="color:#b8e060;text-decoration:none;font-weight:600;">⚙️ Pricing Admin Panel</a>
+</div>
 
 <div class="branch-bar">
   <label>Branch:</label>
   <select class="branch-select" id="branch-select" onchange="loadBranch(this.value)">
     <option value="VB">Virginia Beach</option>
     <option value="CIN">Cincinnati</option>
-    <option value="GRV">Greenville</option>
-    <option value="BSE">Boise</option>
+    <option value="GVL">Greenville</option>
+    <option value="BOI">Boise</option>
   </select>
   <div class="status-pill" id="status-pill">
     <div class="spinner" id="status-spinner"></div>
@@ -928,9 +1064,12 @@
 <!-- ── Toast notification ── -->
 <div class="toast" id="toast"></div>
 
+</div><!-- end #app-container -->
+
 <script>
 // ═══════════════════════════════════════════════════════════
-//  ▼▼ PASTE YOUR APPS SCRIPT URL HERE ▼▼
+//  ▼▼ PASTE YOUR APPS SCRIPT DEPLOYMENT URL HERE ▼▼
+//  (Extensions → Apps Script → Deploy → Web App URL)
 // ═══════════════════════════════════════════════════════════
 const APPS_SCRIPT_URL = "YOUR_APPS_SCRIPT_URL_HERE";
 
@@ -1331,19 +1470,17 @@ function getDefaultProduct(mat) { return getProductsForMat(mat)[0]; }
 async function loadBranch(code) {
   setStatus('loading','Loading pricing…');
   try {
-    const res  = await fetch(APPS_SCRIPT_URL+'?branch='+code);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 10000);
+    const res  = await fetch(APPS_SCRIPT_URL + '?action=getPricing&branch=' + code, { signal: ctrl.signal });
+    clearTimeout(timer);
     const json = await res.json();
     if(json.ok && json.pricing) {
       P = {...FALLBACK,...json.pricing};
       Object.keys(FALLBACK).filter(k=>k.startsWith('addon')).forEach(k=>{
         if(typeof P[k]==='string') P[k]=P[k].split(',').map(x=>parseFloat(x)||0);
       });
-      // Replace branch products with live ones from sheet if present
-      if(json.products && json.products.length) {
-        products = [...FALLBACK_PRODUCTS.filter(p=>p.branch!==code), ...json.products];
-      } else {
-        products = [...FALLBACK_PRODUCTS];
-      }
+      products = [...FALLBACK_PRODUCTS];
       loadedFrom='live';
       setStatus('ok','✓ Live pricing loaded');
     } else { throw new Error(json.error||'failed'); }
@@ -1355,6 +1492,10 @@ async function loadBranch(code) {
   state.productId = getDefaultProduct(state.mat)?.product_id || state.productId;
   renderProducts(); renderHeights(); renderAddons();
   recalc();
+  // Load products from Sheet in background — re-renders when ready
+  if (APPS_SCRIPT_URL && APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') {
+    loadProducts(code);
+  }
 }
 function setStatus(s,t){
   const pill=document.getElementById('status-pill');
@@ -1362,6 +1503,54 @@ function setStatus(s,t){
   pill.className='status-pill '+(s==='loading'?'':s);
   spin.style.display=s==='loading'?'block':'none';
   document.getElementById('status-text').textContent=t;
+}
+
+// ── Dynamic product loading from Google Sheets ─────────────
+async function loadProducts(code) {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 10000);
+    const [prodRes, addonRes] = await Promise.all([
+      fetch(`${APPS_SCRIPT_URL}?action=getProducts&branch=${code}`, { signal: ctrl.signal }),
+      fetch(`${APPS_SCRIPT_URL}?action=getAddons`, { signal: ctrl.signal }),
+    ]);
+    clearTimeout(timer);
+    const prodData  = await prodRes.json();
+    const addonData = await addonRes.json();
+
+    if (prodData.ok && prodData.products && prodData.products.length) {
+      // Parse heights_ft from comma-separated string to array
+      const parsed = prodData.products.map(p => ({
+        ...p,
+        heights_ft: String(p.heights_ft || '6 ft').split(',').map(s => s.trim()).filter(Boolean),
+        section_length_ft: Number(p.section_length_ft) || 8,
+        infill_cost_ea: Number(p.infill_cost_ea) || 0,
+        rail_cost_ea:   Number(p.rail_cost_ea)   || 0,
+        labor_per_lf:   Number(p.labor_per_lf)   || 0,
+      }));
+      // Attach addons from the Addons sheet if available
+      if (addonData.ok && addonData.addons) {
+        parsed.forEach(prod => {
+          prod.addons = addonData.addons
+            .filter(a => a.product_id === prod.product_id)
+            .map(a => ({
+              key:       a.addon_key,
+              label:     a.addon_label,
+              cost_type: a.cost_type,
+              cost_value:Number(a.cost_value) || 0,
+              supplier:  a.supplier || '',
+            }));
+        });
+      }
+      products = parsed;
+    }
+    // On failure: products remain as FALLBACK_PRODUCTS (already set in loadBranch)
+  } catch(e) {
+    // Silently fall back — FALLBACK_PRODUCTS already loaded
+  }
+  // Re-render with updated product list
+  state.productId = getDefaultProduct(state.mat)?.product_id || state.productId;
+  renderProducts(); renderHeights(); renderAddons();
 }
 
 // ── Renders ────────────────────────────────────────────────
@@ -1408,7 +1597,6 @@ function selectMat(mat){
 function selectProduct(id){
   state.productId = id;
   state.addons.clear();
-  document.querySelectorAll('.tier-btn').forEach(b=>b.classList.toggle('active',b.onclick?.toString().includes(`'${id}'`)));
   renderProducts(); renderHeights(); renderAddons(); recalc();
 }
 function selectHeight(h){
@@ -1711,13 +1899,14 @@ function snapToGrid(cx, cy) {
 }
 
 let lastTapTime = 0;
+let _justClosed = false;
 function onTouchStart(e) {
   e.preventDefault();
   const now = Date.now();
   const isDbl = (now - lastTapTime) < 300;
   lastTapTime = now;
   const pt = canvasPos(e, e.target);
-  if (isDbl) { closeFence(); return; }
+  if (isDbl) { closeFence(); _justClosed = true; return; }
   handlePoint(pt, e.target);
 }
 function onTouchEnd(e) { e.preventDefault(); }
@@ -1737,6 +1926,7 @@ function onCanvasHover(e) {
 }
 
 function handlePoint(pt, canvas) {
+  if (_justClosed) { _justClosed = false; return; }
   const ds = drawState;
 
   // Gate mode (open or closed shape): tap toggles gate segments
@@ -2139,26 +2329,32 @@ function applyDrawing() {
   showToast(`✓ Drawing applied — ${state.segments.length} segments, ${Math.round(totalFt)} ft fence${gateNote}`);
 }
 
-// Init canvas on resize
+// Init canvas on resize — rescale existing points to new dimensions
 window.addEventListener('resize', () => {
   if (drawState.mode === 'draw') {
     const canvas = document.getElementById('fence-canvas');
     const wrap = canvas?.parentElement;
-    if (wrap) canvas.width = wrap.clientWidth;
+    if (wrap) {
+      const oldWidth = canvas.width || wrap.clientWidth;
+      const newWidth = wrap.clientWidth;
+      const ratio = newWidth / oldWidth;
+      if (ratio !== 1 && drawState.points.length) {
+        drawState.points = drawState.points.map(p => ({ x: p.x * ratio, y: p.y * ratio }));
+      }
+      canvas.width = newWidth;
+    }
     renderCanvas();
   }
 });
 
-window.addEventListener('DOMContentLoaded',()=>{
-  renderTiers(); renderHeights(); renderAddons();
+function initApp() {
+  renderProducts(); renderHeights(); renderAddons();
   addSegment(); addSegment();
   loadBranch('VB');
-});
+}
 
-// ═══════════════════════════════════════════════════════════
-//  ▼▼ PASTE YOUR OPERATIONS APPS SCRIPT URL HERE ▼▼
-// ═══════════════════════════════════════════════════════════
-const OPS_SCRIPT_URL = "YOUR_OPS_SCRIPT_URL_HERE";
+// When Firebase is not configured (dev mode), initApp is called via DOMContentLoaded bypass above.
+// When Firebase IS configured, initApp is called from onAuthStateChanged after login.
 
 // ── Cached last-calc values for modal / debug ──────────────
 let _lastCalc  = { sell:0, floor:0, total:0, lf:0, matCost:0, labCost:0, gateCost:0 };
@@ -2167,7 +2363,7 @@ let _lastDebug = {};
 // ── Enable sold button only when a valid quote exists ──────
 function updateSoldBtn(){
   const btn = document.getElementById('sold-btn');
-  if(btn) btn.disabled = (_lastCalc.lf === 0);
+  if(btn) btn.disabled = (_lastCalc.sell <= 0 || _lastCalc.lf === 0);
 }
 
 // ── Sold-at box (permanent in quote card) ─────────────────
@@ -2634,67 +2830,20 @@ function buildBOM(){
 }
 
 // ── Submit BOM ─────────────────────────────────────────────
-// ── CORS-safe submission via fetch with no-cors + readable response workaround ──
-// Apps Script GET requests work fine from browsers; POST with JSON body does not.
-// We encode the full payload as base64, send as GET param, use no-cors mode,
-// then do a second credentialed fetch to a lightweight echo endpoint to confirm.
-async function submitViaIframe(url) {
-  return new Promise((resolve) => {
-    // Create a hidden iframe — navigating an iframe doesn't trigger CORS
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.name = 'bom_submit_' + Date.now();
-    document.body.appendChild(iframe);
-
-    // Use a form POST through the iframe — this works around CORS for Apps Script
-    const form = document.createElement('form');
-    form.method = 'GET';
-    // Strip query string from action — params go as hidden inputs for GET forms
-    const urlObj = new URL(url.indexOf('?') > -1 ? url : url + '?');
-    form.action = urlObj.origin + urlObj.pathname;
-    form.target = iframe.name;
-    // Add all query params as hidden inputs
-    urlObj.searchParams.forEach((val, key) => {
-      const inp = document.createElement('input');
-      inp.type = 'hidden'; inp.name = key; inp.value = val;
-      form.appendChild(inp);
-    });
-    document.body.appendChild(form);
-
-    // Wait for iframe load then clean up
-    let resolved = false;
-    iframe.onload = () => {
-      if (resolved) return;
-      resolved = true;
-      // We can't read iframe content cross-origin, so we trust it worked
-      // and poll the ops sheet for confirmation via a lightweight check
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-        document.body.removeChild(form);
-        resolve('submitted'); // treated as success
-      }, 800);
-    };
-    // Timeout fallback
-    setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        try { document.body.removeChild(iframe); document.body.removeChild(form); } catch(e){}
-        resolve(null);
-      }
-    }, 8000);
-
-    form.submit();
-  });
-}
-
 async function submitBOM(){
-  const customer   = document.getElementById('inp-customer').value.trim();
-  const address    = document.getElementById('inp-address').value.trim();
-  const salesperson= document.getElementById('inp-salesperson').value.trim();
-  const soldPrice  = parseFloat(document.getElementById('inp-sold-price').value)||0;
-  const notes      = document.getElementById('inp-notes').value.trim();
-  const branch     = document.getElementById('branch-select').value;
-  const branchName = document.getElementById('branch-select').selectedOptions[0].text;
+  if (_lastCalc.sell <= 0) {
+    showToast('⚠ Calculate a quote before submitting', true);
+    return;
+  }
+
+  const customer    = document.getElementById('inp-customer').value.trim();
+  const address     = document.getElementById('inp-address').value.trim();
+  const salesperson = document.getElementById('inp-salesperson').value.trim();
+  const soldPrice   = parseFloat(document.getElementById('inp-sold-price').value)||0;
+  const notes       = document.getElementById('inp-notes').value.trim();
+  const branchEl    = document.getElementById('branch-select');
+  const branch      = branchEl.value;
+  const branchName  = branchEl.selectedOptions[0]?.text || branch;
 
   const posts  = countPosts();
   const bom    = buildBOM();
@@ -2706,51 +2855,50 @@ async function submitBOM(){
   const actualMarginPct = _lastCalc.floor > 0 ? ((1-(_lastCalc.floor/soldPrice))*100).toFixed(1) : '—';
 
   const payload = {
-    // Job info
-    submittedAt:  new Date().toISOString(),
+    submittedAt:    new Date().toISOString(),
+    userEmail:      typeof currentUser !== 'undefined' && currentUser ? currentUser.email : '',
     branch, branchName,
     customer, address, salesperson, notes,
     soldPrice, belowFloor,
-    suggestedSell: Math.round(_lastCalc.sell),
-    floorPrice:    Math.round(_lastCalc.floor),
+    suggestedSell:  Math.round(_lastCalc.sell),
+    floorPrice:     Math.round(_lastCalc.floor),
     actualMarginPct,
-    // Fence spec
-    material:   state.mat,
-    productId:  state.productId,
-    product:    _sbProd?.product_name || '',
-    height:     state.height,
-    linearFt:   posts.lf,
-    sections:   posts.secs,
+    material:       state.mat,
+    productId:      state.productId,
+    product:        _sbProd?.product_name || '',
+    height:         state.height,
+    linearFt:       posts.lf,
+    sections:       posts.secs,
     cornerPosts:    posts.corners,
     terminalPosts:  posts.terminals + posts.gatePosts,
     linePosts:      posts.linePosts,
     totalPosts:     posts.corners + posts.terminals + posts.gatePosts + posts.linePosts,
-    gatesWalk:  gWalk,
-    gatesDouble:gDbl,
-    gatesCustom:gCustQ,
-    addons:     [...state.addons].join(','),
-    segments:   state.segments.map(s=>({length:s.length,start:s.start,end:s.end})),
-    // BOM
+    gatesWalk:      gWalk,
+    gatesDouble:    gDbl,
+    gatesCustom:    gCustQ,
+    addons:         [...state.addons].join(','),
+    segments:       state.segments.map(s=>({length:s.length,start:s.start,end:s.end})),
     bom,
-    bomTotal: bom.reduce((s,i)=>s+(i.qty*i.unitCost),0),
+    bomTotal:       bom.reduce((s,i)=>s+(i.qty*i.unitCost),0),
   };
 
-  // Show loading
   const btn = document.getElementById('modal-submit-btn');
   btn.classList.add('loading'); btn.disabled=true;
 
   try {
-    // Google Apps Script doesn't support CORS preflight from browsers,
-    // so we encode the payload as a base64 query param and use GET + no-cors.
-    // The script returns the job ID via a redirect to a data: URL we parse.
-    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-    // Use a hidden iframe trick to fire the GET without CORS blocking
-    const jobId = await submitViaIframe(OPS_SCRIPT_URL + '?data=' + encoded);
-    const json = jobId ? { ok:true, jobNumber: jobId } : { ok:false, error:'No response' };
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method:  'POST',
+      body:    JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' },
+      signal:  ctrl.signal,
+    });
+    clearTimeout(timer);
+    const json = await res.json();
     if(json.ok){
       document.getElementById('modal-overlay').classList.remove('open');
-      showToast(`✓ BOM submitted for ${branchName} — check the Operations Sheet`);
-      // Reset form
+      showToast(`✓ BOM submitted for ${branchName} — job logged to Operations Sheet`);
       ['inp-customer','inp-address','inp-salesperson','inp-notes'].forEach(id=>document.getElementById(id).value='');
       document.getElementById('inp-sold-price').value='';
     } else {
@@ -2758,7 +2906,7 @@ async function submitBOM(){
     }
   } catch(e){
     showToast('⚠ Submission failed — check connection and try again', true);
-    console.error(e);
+    console.error('BOM submit error:', e);
   }
   btn.classList.remove('loading'); btn.disabled=false;
 }
