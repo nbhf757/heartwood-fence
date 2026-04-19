@@ -503,6 +503,74 @@
   .empty-state .big { font-size: 2.2rem; margin-bottom: 8px; opacity: 0.5; }
   .hidden { display: none !important; }
 
+  /* ── View Tabs ── */
+  .view-tabs {
+    display: flex; background: #fff; border-bottom: 2px solid var(--border);
+    padding: 0 24px; gap: 0;
+  }
+  .view-tab {
+    padding: 10px 20px; border: none; background: transparent; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 0.83rem; font-weight: 600;
+    color: var(--mid); border-bottom: 3px solid transparent; margin-bottom: -2px;
+    transition: color .12s, border-color .12s;
+  }
+  .view-tab:hover { color: var(--navy); }
+  .view-tab.active { color: var(--navy); border-bottom-color: var(--green); }
+
+  /* ── Annotation Bar ── */
+  .annotation-bar {
+    padding: 6px 12px; background: #eef2ff; border: 1px solid #ccd4f0; border-radius: 6px;
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px;
+  }
+  .annotation-bar .ann-label {
+    font-size: 0.72rem; font-weight: 700; color: var(--mid); text-transform: uppercase;
+    letter-spacing: .08em; white-space: nowrap;
+  }
+  .ann-btn {
+    padding: 4px 10px; border-radius: 5px; border: 1.5px solid var(--border);
+    background: #fff; font-size: 0.78rem; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    transition: background .1s, border-color .1s;
+  }
+  .ann-btn:hover { border-color: var(--navy); background: #f0f4ff; }
+  .ann-btn.active { border-color: var(--green); background: #f0ffe0; }
+
+  /* ── History / Dashboard Views ── */
+  .view-panel { padding: 18px 24px; }
+  .hist-search {
+    width: 100%; max-width: 400px; padding: 7px 12px;
+    border: 1.5px solid var(--border); border-radius: 6px; font-size: 0.83rem;
+    font-family: 'DM Sans', sans-serif; margin-bottom: 14px;
+  }
+  .hist-search:focus { outline: none; border-color: var(--green); }
+
+  .job-card {
+    background: #fff; border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 16px; margin-bottom: 10px;
+    display: flex; align-items: flex-start; gap: 14px;
+    box-shadow: 0 1px 4px rgba(19,36,90,0.06);
+  }
+  .job-card-info { flex: 1; min-width: 0; }
+  .job-card-name { font-weight: 700; font-size: 0.88rem; color: var(--navy); }
+  .job-card-addr { font-size: 0.78rem; color: var(--mid); margin-top: 2px; }
+  .job-card-meta { font-size: 0.75rem; color: var(--mid); margin-top: 5px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .job-card-meta .branch-badge {
+    background: var(--navy); color: #fff; border-radius: 4px; padding: 1px 7px; font-weight: 700; font-size: 0.68rem;
+  }
+  .job-card-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+  .job-card-price { font-weight: 700; color: var(--green2); font-size: 0.95rem; }
+  .btn-load { padding: 4px 10px; font-size: 0.75rem; border-radius: 5px; border: 1.5px solid var(--border); background: var(--cream); cursor: pointer; font-family: 'DM Sans', sans-serif; white-space: nowrap; }
+  .btn-load:hover { border-color: var(--navy); }
+  .job-sketch { width: 64px; height: 48px; object-fit: cover; border-radius: 5px; border: 1px solid var(--border); flex-shrink: 0; cursor: pointer; }
+
+  .stat-cards { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+  .stat-card {
+    background: #fff; border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px 18px; min-width: 140px; flex: 1;
+    box-shadow: 0 1px 4px rgba(19,36,90,0.06);
+  }
+  .stat-card .stat-val { font-size: 1.5rem; font-weight: 700; color: var(--navy); font-family: 'Playfair Display', serif; }
+  .stat-card .stat-lbl { font-size: 0.72rem; color: var(--mid); font-weight: 600; text-transform: uppercase; letter-spacing: .07em; margin-top: 2px; }
+
   @media (max-width: 680px) {
     .container { grid-template-columns: 1fr; }
     .quote-panel { position: static; }
@@ -514,6 +582,8 @@
 <!-- ── Firebase Auth ─────────────────────────────────────────── -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script>
 // ── Firebase config — paste values from Firebase Console ──────
 // Project Settings → Your Apps → Web app → SDK setup and configuration
@@ -525,38 +595,57 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "876777205707",
   appId:             "1:876777205707:web:0b83a7e9cc2cad40da904e"
 };
-const AUTH_DOMAIN    = 'heartwoodfenceva.com';
+const AUTH_DOMAINS   = ['heartwoodfenceva.com', 'heartwood-fence.com'];
 const ADMIN_EMAILS   = ['fadi@heartwoodfenceva.com', 'nathan@heartwoodfenceva.com'];
+const BRANCH_OWNERS  = {
+  'spencer@heartwoodfenceva.com': ['VB'],
+  'natalie@heartwood-fence.com':  ['CIN'],
+  'kevin@heartwood-fence.com':    ['GRV'],
+  'graeme@heartwood-fence.com':   ['BSE'],
+  'kirk@heartwoodfenceva.com':    ['BSE'],
+};
 
-let currentUser = null;
-let isAdmin     = false;
+let currentUser  = null;
+let isAdmin      = false;
+let userRole     = 'rep';    // 'admin' | 'owner' | 'rep'
+let userBranches = [];
 let _firebaseReady = false;
+let _db = null, _storage = null;
 
 // Only initialize if config has been filled in
 if (FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_FIREBASE_API_KEY') {
   firebase.initializeApp(FIREBASE_CONFIG);
+  _db      = firebase.firestore();
+  _storage = firebase.storage();
   const _auth     = firebase.auth();
   const _provider = new firebase.auth.GoogleAuthProvider();
-  _provider.setCustomParameters({ hd: AUTH_DOMAIN, prompt: 'select_account' });
+  _provider.setCustomParameters({ prompt: 'select_account' });
   _firebaseReady = true;
 
   _auth.onAuthStateChanged(user => {
     if (user) {
       const domain = (user.email || '').split('@')[1] || '';
-      if (domain !== AUTH_DOMAIN) {
+      if (!AUTH_DOMAINS.includes(domain)) {
         _auth.signOut();
-        _showAuthError(`Access is restricted to @${AUTH_DOMAIN} accounts. You signed in as ${user.email}.`);
+        _showAuthError(`Access is restricted to Heartwood accounts. You signed in as ${user.email}.`);
         return;
       }
       currentUser = user;
-      isAdmin     = ADMIN_EMAILS.includes(user.email.toLowerCase());
+      const email = user.email.toLowerCase();
+      if (ADMIN_EMAILS.includes(email)) {
+        isAdmin = true; userRole = 'admin'; userBranches = ['VB','CIN','GRV','BSE'];
+      } else if (BRANCH_OWNERS[email]) {
+        isAdmin = false; userRole = 'owner'; userBranches = BRANCH_OWNERS[email];
+      } else {
+        isAdmin = false; userRole = 'rep'; userBranches = [];
+      }
       document.getElementById('auth-overlay').style.display = 'none';
       document.getElementById('app-container').style.display = 'block';
       _applyRoleUI();
       if (typeof initApp === 'function') initApp();
     } else {
       currentUser = null;
-      isAdmin     = false;
+      isAdmin = false; userRole = 'rep'; userBranches = [];
       document.getElementById('auth-overlay').style.display = 'flex';
       document.getElementById('app-container').style.display = 'none';
     }
@@ -592,13 +681,15 @@ function _applyRoleUI() {
   const adminBar = document.getElementById('admin-toolbar');
   if (adminBar) {
     adminBar.style.display = isAdmin ? 'flex' : 'none';
-    // Set admin links dynamically using the deployed Apps Script URL
     const sheetLink = document.getElementById('admin-sheet-link');
     const panelLink = document.getElementById('admin-panel-link');
-    // ▼▼ Replace YOUR_SPREADSHEET_ID with the actual Spreadsheet ID ▼▼
     if (sheetLink) sheetLink.href = 'https://docs.google.com/spreadsheets/d/1jcRvb30Cityh30xbHaa7RJsZ_uN9Iok3KrDFfEIHOnc/edit';
     if (panelLink && APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') panelLink.href = APPS_SCRIPT_URL;
   }
+
+  // Show dashboard tab for admins and owners
+  const dashTab = document.getElementById('tab-dashboard');
+  if (dashTab) dashTab.style.display = (userRole === 'admin' || userRole === 'owner') ? '' : 'none';
 
   const userInfoEls = document.querySelectorAll('.user-info-area');
   userInfoEls.forEach(el => {
@@ -683,6 +774,15 @@ function _applyRoleUI() {
   </div>
 </div>
 
+<!-- ── View Tabs ── -->
+<div class="view-tabs" id="view-tabs">
+  <button class="view-tab active" data-view="calculator" onclick="switchView('calculator')">Calculator</button>
+  <button class="view-tab" data-view="history" id="tab-history" onclick="switchView('history')">My Jobs</button>
+  <button class="view-tab" data-view="dashboard" id="tab-dashboard" onclick="switchView('dashboard')" style="display:none">Dashboard</button>
+</div>
+
+<!-- ── View: Calculator ── -->
+<div id="view-calculator">
 <div class="container">
   <div>
 
@@ -879,6 +979,18 @@ function _applyRoleUI() {
           <button class="canvas-btn primary" onclick="applyDrawing()" id="btn-apply">✓ Use This Layout</button>
         </div>
 
+        <!-- Annotation toolbar -->
+        <div class="annotation-bar" id="annotation-bar">
+          <span class="ann-label">Add Marker:</span>
+          <button class="ann-btn" data-type="tree" onclick="setAnnotationType('tree')">🌳 Tree</button>
+          <button class="ann-btn" data-type="house" onclick="setAnnotationType('house')">🏠 House</button>
+          <button class="ann-btn" data-type="good" onclick="setAnnotationType('good')">↑ Good Side</button>
+          <button class="ann-btn" data-type="structure" onclick="setAnnotationType('structure')">▪ Structure</button>
+          <button class="ann-btn" data-type="gate" onclick="setAnnotationType('gate')">⛩ Gate Spot</button>
+          <button class="ann-btn" data-type="note" onclick="setAnnotationType('note')">✏️ Note</button>
+          <button class="ann-btn" style="margin-left:auto;color:var(--warn)" onclick="clearAnnotations()">✕ Clear Markers</button>
+        </div>
+
         <!-- Canvas -->
         <div class="canvas-wrap">
           <canvas id="fence-canvas" height="360"></canvas>
@@ -1059,6 +1171,21 @@ function _applyRoleUI() {
       </button>
     </div>
   </div>
+</div>
+
+</div><!-- end #view-calculator -->
+
+<!-- ── View: My Jobs (History) ── -->
+<div id="view-history" style="display:none" class="view-panel">
+  <input class="hist-search" id="hist-search" type="text" placeholder="Search by customer or address…" oninput="filterHistory()">
+  <div id="history-list"><p style="color:var(--mid);font-size:.85rem;">Switch to this tab to load your jobs.</p></div>
+</div>
+
+<!-- ── View: Dashboard ── -->
+<div id="view-dashboard" style="display:none" class="view-panel">
+  <div class="stat-cards" id="dashboard-stats"></div>
+  <input class="hist-search" id="dash-search" type="text" placeholder="Filter jobs…" oninput="filterDashboard()">
+  <div id="dashboard-jobs"><p style="color:var(--mid);font-size:.85rem;">Switch to this tab to load the dashboard.</p></div>
 </div>
 
 <!-- ── Toast notification ── -->
@@ -1564,6 +1691,13 @@ function renderProducts(){
       <div class="tier-supplier">${p.product_name}</div>
       <div class="tier-desc">${(p.heights_ft||[]).join(' · ')}</div>
     </div>`).join('');
+  // Apply pending load-as-starting-point state
+  if (pendingLoadState) {
+    const { material, height } = pendingLoadState;
+    pendingLoadState = null;
+    if (material && material !== state.mat) { selectMat(material); return; }
+    if (height) { state.height = height; renderHeights(); recalc(); }
+  }
 }
 function renderHeights(){
   const prod = getProduct();
@@ -1837,6 +1971,21 @@ let drawState = {
   mode:         'manual',  // 'manual' | 'draw'
 };
 
+let annotations = [];          // [{type, x, y, label, angle}]
+let activeAnnotationType = null; // set when user clicks an ann-btn
+
+function setAnnotationType(type) {
+  activeAnnotationType = type;
+  document.querySelectorAll('.ann-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.type === type);
+  });
+}
+
+function clearAnnotations() {
+  annotations = [];
+  renderCanvas();
+}
+
 const SNAP = 10;   // snap-to-grid pixel threshold
 const MIN_CLOSE_DIST = 18; // px to snap-close the shape
 
@@ -1927,6 +2076,27 @@ function onCanvasHover(e) {
 
 function handlePoint(pt, canvas) {
   if (_justClosed) { _justClosed = false; return; }
+
+  // Annotation placement mode
+  if (activeAnnotationType) {
+    const type = activeAnnotationType;
+    let label = '', angle = 0;
+    if (type === 'note') {
+      label = (prompt('Enter note text:') || '').trim();
+      if (!label) { activeAnnotationType = null; document.querySelectorAll('.ann-btn').forEach(b => b.classList.remove('active')); return; }
+    }
+    // For 'good' type, check if there's an existing 'good' annotation nearby to rotate it
+    if (type === 'good') {
+      const existing = annotations.find(a => a.type === 'good' && Math.hypot(a.x - pt.x, a.y - pt.y) < 20);
+      if (existing) { existing.angle = (existing.angle || 0) + Math.PI / 2; renderCanvas(); return; }
+    }
+    annotations.push({ type, x: pt.x, y: pt.y, label, angle });
+    activeAnnotationType = null;
+    document.querySelectorAll('.ann-btn').forEach(b => b.classList.remove('active'));
+    renderCanvas();
+    return;
+  }
+
   const ds = drawState;
 
   // Gate mode (open or closed shape): tap toggles gate segments
@@ -2261,6 +2431,34 @@ function renderCanvas() {
     ctx.fillStyle = '#13245a';
     ctx.fillText(totalLabel, W-tw-1, H-19);
   }
+
+  // Draw annotations
+  const annIcons = { tree: '🌳', house: '🏠', structure: '▪', gate: '⛩' };
+  annotations.forEach(ann => {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (ann.type === 'good') {
+      ctx.translate(ann.x, ann.y);
+      ctx.rotate(ann.angle || 0);
+      ctx.font = 'bold 20px sans-serif';
+      ctx.fillStyle = '#1a7a3a';
+      ctx.fillText('↑', 0, 0);
+    } else {
+      ctx.font = '20px serif';
+      ctx.fillText(annIcons[ann.type] || '📍', ann.x, ann.y);
+      if (ann.type === 'note' && ann.label) {
+        ctx.font = 'bold 10px DM Sans, sans-serif';
+        ctx.fillStyle = '#13245a';
+        const noteW = ctx.measureText(ann.label).width + 8;
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.beginPath(); rrect(ctx, ann.x - noteW/2, ann.y + 12, noteW, 14, 3); ctx.fill();
+        ctx.fillStyle = '#13245a';
+        ctx.fillText(ann.label, ann.x, ann.y + 19);
+      }
+    }
+    ctx.restore();
+  });
 }
 
 function calcTotalDrawFt() {
@@ -2886,6 +3084,9 @@ async function submitBOM(){
   btn.classList.add('loading'); btn.disabled=true;
 
   try {
+    // Upload sketch first (non-blocking failure)
+    const sketchUrl = await uploadSketch();
+
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 15000);
     const res = await fetch(APPS_SCRIPT_URL, {
@@ -2897,8 +3098,11 @@ async function submitBOM(){
     clearTimeout(timer);
     const json = await res.json();
     if(json.ok){
+      // Save to Firestore
+      await saveJobToFirestore(payload, json.jobId || ('HW-' + Date.now()), sketchUrl);
+
       document.getElementById('modal-overlay').classList.remove('open');
-      showToast(`✓ BOM submitted for ${branchName} — job logged to Operations Sheet`);
+      showToast(`✓ BOM submitted for ${branchName} — job logged`);
       ['inp-customer','inp-address','inp-salesperson','inp-notes'].forEach(id=>document.getElementById(id).value='');
       document.getElementById('inp-sold-price').value='';
     } else {
@@ -2911,12 +3115,197 @@ async function submitBOM(){
   btn.classList.remove('loading'); btn.disabled=false;
 }
 
+async function uploadSketch() {
+  if (!_storage || !currentUser) return '';
+  if (!drawState.points || drawState.points.length < 2) return '';
+  try {
+    const canvas = document.getElementById('fence-canvas');
+    if (!canvas) return '';
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+    const ref  = _storage.ref(`sketches/${currentUser.uid}/${Date.now()}.png`);
+    await ref.put(blob);
+    return await ref.getDownloadURL();
+  } catch(e) {
+    console.warn('Sketch upload skipped:', e.message);
+    return '';
+  }
+}
+
+async function saveJobToFirestore(payload, jobId, sketchUrl) {
+  if (!_db || !currentUser) return;
+  try {
+    await _db.collection('jobs').doc(jobId).set({
+      jobId,
+      userId:         currentUser.uid,
+      userEmail:      currentUser.email,
+      branch:         payload.branch         || '',
+      customer:       payload.customer       || '',
+      address:        payload.address        || '',
+      material:       payload.material       || '',
+      height:         payload.height         || '',
+      linearFt:       payload.linearFt       || 0,
+      soldPrice:      payload.soldPrice       || 0,
+      suggestedPrice: payload.suggestedSell  || 0,
+      floorPrice:     payload.floorPrice      || 0,
+      notes:          payload.notes          || '',
+      bom:            payload.bom            || [],
+      sketchUrl:      sketchUrl              || '',
+      createdAt:      firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch(e) {
+    console.warn('Firestore save failed:', e.message);
+  }
+}
+
 function showToast(msg, isErr=false){
   const t=document.getElementById('toast');
   t.textContent=msg;
   t.style.borderLeftColor = isErr?'#c0392b':'var(--green)';
   t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), 4500);
+}
+
+// ── View switching ────────────────────────────────────────────
+function switchView(name) {
+  document.querySelectorAll('.view-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.view === name);
+  });
+  ['calculator','history','dashboard'].forEach(v => {
+    const el = document.getElementById('view-' + v);
+    if (el) el.style.display = v === name ? '' : 'none';
+  });
+  if (name === 'history')   loadHistory();
+  if (name === 'dashboard') loadDashboard();
+}
+
+// ── Job history ───────────────────────────────────────────────
+let _allHistoryJobs = [];
+
+async function loadHistory() {
+  if (!_db) return;
+  const listEl = document.getElementById('history-list');
+  listEl.innerHTML = '<p style="color:var(--mid);font-size:.85rem;padding:8px 0;">Loading…</p>';
+
+  try {
+    let q = _db.collection('jobs').orderBy('createdAt', 'desc').limit(60);
+    if (userRole === 'rep') q = q.where('userId', '==', currentUser.uid);
+    const snap = await q.get();
+    _allHistoryJobs = snap.docs.map(d => d.data());
+    renderHistoryList(_allHistoryJobs, listEl);
+  } catch(e) {
+    listEl.innerHTML = '<p style="color:var(--warn);font-size:.83rem;">Failed to load jobs. Make sure Firestore is enabled.</p>';
+  }
+}
+
+function filterHistory() {
+  const q = (document.getElementById('hist-search').value || '').toLowerCase();
+  const filtered = q ? _allHistoryJobs.filter(j =>
+    (j.customer||'').toLowerCase().includes(q) || (j.address||'').toLowerCase().includes(q)
+  ) : _allHistoryJobs;
+  renderHistoryList(filtered, document.getElementById('history-list'));
+}
+
+function renderHistoryList(jobs, el) {
+  if (!jobs.length) {
+    el.innerHTML = '<p style="color:var(--mid);font-size:.83rem;padding:8px 0;">No jobs found.</p>';
+    return;
+  }
+  el.innerHTML = jobs.map(j => {
+    const date = j.createdAt?.toDate ? j.createdAt.toDate().toLocaleDateString() : '—';
+    const price = j.soldPrice ? '$' + j.soldPrice.toLocaleString() : '—';
+    const name = j.customer || '<em style="opacity:.55">No name</em>';
+    const addr = j.address  || '<em style="opacity:.55">No address</em>';
+    const sketch = j.sketchUrl ? `<a href="${j.sketchUrl}" target="_blank"><img class="job-sketch" src="${j.sketchUrl}" alt="sketch"></a>` : '';
+    return `<div class="job-card">
+      ${sketch}
+      <div class="job-card-info">
+        <div class="job-card-name">${name}</div>
+        <div class="job-card-addr">${addr}</div>
+        <div class="job-card-meta">
+          <span class="branch-badge">${j.branch||''}</span>
+          <span>${j.material||''}</span>
+          ${j.height ? `<span>${j.height}</span>` : ''}
+          <span>${j.linearFt||0} ft</span>
+          <span>${date}</span>
+          <span style="color:var(--mid);font-size:.7rem;">${j.userEmail||''}</span>
+        </div>
+      </div>
+      <div class="job-card-actions">
+        <div class="job-card-price">${price}</div>
+        <button class="btn-load" onclick='loadJobAsStartingPoint(${JSON.stringify({customer:j.customer,address:j.address,notes:j.notes,branch:j.branch,material:j.material,height:j.height})})'>↩ Load</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Dashboard ─────────────────────────────────────────────────
+let _allDashJobs = [];
+
+async function loadDashboard() {
+  if (!_db) return;
+  const jobsEl  = document.getElementById('dashboard-jobs');
+  const statsEl = document.getElementById('dashboard-stats');
+  jobsEl.innerHTML  = '<p style="color:var(--mid);font-size:.85rem;padding:8px 0;">Loading…</p>';
+  statsEl.innerHTML = '';
+
+  try {
+    let q = _db.collection('jobs').orderBy('createdAt', 'desc').limit(200);
+    if (userRole === 'owner') q = q.where('branch', 'in', userBranches);
+    const snap = await q.get();
+    _allDashJobs = snap.docs.map(d => d.data());
+    renderDashboardStats(_allDashJobs);
+    renderHistoryList(_allDashJobs, jobsEl);
+  } catch(e) {
+    jobsEl.innerHTML = '<p style="color:var(--warn);font-size:.83rem;">Failed to load dashboard. Make sure Firestore is enabled.</p>';
+  }
+}
+
+function filterDashboard() {
+  const q = (document.getElementById('dash-search').value || '').toLowerCase();
+  const filtered = q ? _allDashJobs.filter(j =>
+    (j.customer||'').toLowerCase().includes(q) || (j.address||'').toLowerCase().includes(q)
+  ) : _allDashJobs;
+  renderHistoryList(filtered, document.getElementById('dashboard-jobs'));
+}
+
+function renderDashboardStats(jobs) {
+  const statsEl = document.getElementById('dashboard-stats');
+  const totalJobs = jobs.length;
+  const totalRev  = jobs.reduce((s, j) => s + (j.soldPrice || 0), 0);
+  const avgFt     = totalJobs ? Math.round(jobs.reduce((s, j) => s + (j.linearFt || 0), 0) / totalJobs) : 0;
+
+  // Jobs per branch
+  const byBranch = {};
+  jobs.forEach(j => { byBranch[j.branch] = (byBranch[j.branch] || 0) + 1; });
+  const branchBreakdown = Object.entries(byBranch).sort((a,b) => b[1]-a[1])
+    .map(([b, n]) => `<span class="branch-badge" style="margin-right:4px;">${b}</span> ${n}`).join('  ');
+
+  statsEl.innerHTML = [
+    { val: totalJobs, lbl: 'Total Jobs' },
+    { val: '$' + totalRev.toLocaleString(), lbl: 'Total Revenue' },
+    { val: avgFt + ' ft', lbl: 'Avg Job Size' },
+  ].map(s => `<div class="stat-card"><div class="stat-val">${s.val}</div><div class="stat-lbl">${s.lbl}</div></div>`).join('')
+  + (branchBreakdown ? `<div class="stat-card" style="flex:2"><div class="stat-lbl" style="margin-bottom:6px;">Jobs by Branch</div><div style="font-size:.82rem;">${branchBreakdown}</div></div>` : '');
+}
+
+// ── Load a past job as starting point ────────────────────────
+let pendingLoadState = null;
+
+function loadJobAsStartingPoint(job) {
+  switchView('calculator');
+  const c = document.getElementById('inp-customer');
+  const a = document.getElementById('inp-address');
+  const n = document.getElementById('inp-notes');
+  if (c) c.value = job.customer || '';
+  if (a) a.value = job.address  || '';
+  if (n) n.value = job.notes    || '';
+  const branchSel = document.getElementById('branch-select');
+  if (branchSel && job.branch) {
+    branchSel.value = job.branch;
+    branchSel.dispatchEvent(new Event('change'));
+  }
+  if (job.material || job.height) pendingLoadState = { material: job.material, height: job.height };
+  showToast('Job loaded as starting point');
 }
 </script>
 </body>
