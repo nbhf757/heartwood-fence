@@ -19,7 +19,7 @@
 
 // ── Config ────────────────────────────────────────────────────────
 const SPREADSHEET_ID = '1jcRvb30Cityh30xbHaa7RJsZ_uN9Iok3KrDFfEIHOnc';
-const ALLOWED_DOMAIN = 'heartwoodfenceva.com';
+const ALLOWED_DOMAINS = ['heartwoodfenceva.com', 'heartwood-fence.com'];
 const ADMIN_EMAILS   = ['fadi@heartwoodfenceva.com', 'nathan@heartwoodfenceva.com'];
 const SHEET_PRICING  = 'Pricing';
 const SHEET_PRODUCTS = 'Products';
@@ -49,7 +49,8 @@ function doPost(e) {
     const userEmail = (payload.userEmail || '').toLowerCase();
 
     // Domain check — prevent submissions from outside the org
-    if (!userEmail.endsWith('@' + ALLOWED_DOMAIN)) {
+    const domain = userEmail.split('@')[1] || '';
+    if (!ALLOWED_DOMAINS.includes(domain)) {
       return jsonResponse({ ok: false, error: 'Unauthorized domain' });
     }
 
@@ -203,7 +204,7 @@ function adminGetPricing() {
 
 function adminSaveCell(rowIndex, colIndex, value) {
   const email = Session.getActiveUser().getEmail();
-  if (!email.endsWith('@' + ALLOWED_DOMAIN)) {
+  if (!ALLOWED_DOMAINS.includes(email.split('@')[1] || '')) {
     throw new Error('Unauthorized');
   }
   const ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -217,7 +218,7 @@ function adminSaveCell(rowIndex, colIndex, value) {
 
 function adminSaveAll(rows) {
   const email = Session.getActiveUser().getEmail();
-  if (!email.endsWith('@' + ALLOWED_DOMAIN)) {
+  if (!ALLOWED_DOMAINS.includes(email.split('@')[1] || '')) {
     throw new Error('Unauthorized');
   }
   const ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
