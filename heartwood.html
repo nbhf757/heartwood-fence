@@ -3509,6 +3509,10 @@ function buildBOM(){
 
 // ── Submit BOM ─────────────────────────────────────────────
 async function submitBOM(){
+  if (!currentUser) {
+    showToast('⚠ Please sign in with a Heartwood account to submit', true);
+    return;
+  }
   if (_lastCalc.sell <= 0) {
     showToast('⚠ Calculate a quote before submitting', true);
     return;
@@ -3568,7 +3572,7 @@ async function submitBOM(){
     const sketchUrl = await uploadSketch();
 
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 15000);
+    const timer = setTimeout(() => ctrl.abort(), 20000);
     const res = await fetch(APPS_SCRIPT_URL, {
       method:  'POST',
       body:    JSON.stringify(payload),
@@ -3577,24 +3581,38 @@ async function submitBOM(){
       signal:  ctrl.signal,
     });
     clearTimeout(timer);
-    const json = await res.json();
-    if(json.ok){
-      // Save to Firestore (non-blocking — Sheet log is source of truth)
-      try {
-        await saveJobToFirestore(payload, json.jobId || ('HW-' + Date.now()), sketchUrl);
-      } catch(fsErr) {
-        console.warn('Firestore save failed (non-critical):', fsErr);
+
+    // Read as text first — Apps Script can return HTML (login/redirect page) if
+    // the deployment "Who has access" is set to "Anyone with Google account" instead of "Anyone"
+    const text = await res.text();
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch(_) {
+      const preview = text.substring(0, 120).replace(/\s+/g,' ');
+      console.error('Apps Script non-JSON response:', preview);
+      if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+        throw new Error('Apps Script returned a login/redirect page. Open the deployment URL directly in your browser to confirm access, or re-deploy with "Who has access: Anyone".');
       }
+      throw new Error('Unexpected response from server. Check the browser console for details.');
+    }
+
+    if(json.ok){
+      // Firestore save is non-blocking — Sheet is the source of truth
+      saveJobToFirestore(payload, json.jobId || ('HW-' + Date.now()), sketchUrl);
 
       document.getElementById('modal-overlay').classList.remove('open');
       showToast(`✓ BOM submitted for ${branchName} — job logged`);
       ['inp-customer','inp-address','inp-salesperson','inp-notes'].forEach(id=>document.getElementById(id).value='');
       document.getElementById('inp-sold-price').value='';
     } else {
-      throw new Error(json.error||'Submission failed');
+      throw new Error(json.error || 'Submission failed');
     }
   } catch(e){
-    showToast('⚠ Submission failed — check connection and try again', true);
+    const errMsg = e.name === 'AbortError'
+      ? 'Request timed out — Apps Script may be starting cold. Try again.'
+      : (e.message || 'Submission failed');
+    showToast('⚠ ' + errMsg, true);
     console.error('BOM submit error:', e);
   }
   btn.classList.remove('loading'); btn.disabled=false;

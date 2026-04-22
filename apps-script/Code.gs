@@ -5,7 +5,10 @@
 //   Extensions → Apps Script → Deploy → New Deployment
 //   Type: Web App
 //   Execute as: Me
-//   Who has access: Anyone with Google account
+//   Who has access: Anyone   ← MUST be "Anyone" (NOT "Anyone with Google account")
+//                               "Anyone with Google account" causes a login-page redirect
+//                               when the app fetches from the browser, breaking POST submissions.
+//                               Security is handled by the userEmail domain check in doPost.
 //
 // After deploying, copy the Web App URL and paste it into heartwood.html:
 //   const APPS_SCRIPT_URL = "https://script.google.com/macros/s/YOUR_ID/exec";
