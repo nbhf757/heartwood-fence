@@ -1,0 +1,28 @@
+product_id,addon_key,addon_label,cost_type,cost_value,supplier,notes
+INSTRUCTIONS,,Label shown in app checkbox,ea = cost per unit (app calculates how many units and derives $/lf). lf = sold by the foot (enter $/lf directly). kit = fixed cost per gate opening.,Cost per unit / per lf / per kit ($),Supplier,Notes
+grv_wood_privacy_58,board_on_board,Board on Board,ea,2.81,SDA,Same picket EA cost as base product (SDA1237) — app adds 70% more pickets
+grv_wood_privacy_58,lattice_top,Lattice Top,ea,?,?,Cost per 4x8 lattice panel — app uses ceil(sections/2) panels and switches to 4ft pickets ($2.81 EA)
+grv_wood_privacy_58,top_cap_fascia,Top Cap & Fascia,ea,?,?,1x4x16 running two sections — need board cost from SDA
+grv_wood_privacy_58,gaps_in_pickets,Gaps in Pickets,ea,0,n/a,Style/layout note only — no material cost change. App reduces picket count ~15%.
+grv_wood_privacy_34,board_on_board,Board on Board,ea,?,?,Same picket EA cost as base product — confirm 3/4" picket SKU with SDA
+grv_wood_privacy_34,lattice_top,Lattice Top,ea,?,?,Cost per 4x8 lattice panel — switches to 4ft pickets
+grv_wood_privacy_34,top_cap_fascia,Top Cap & Fascia,ea,?,?,1x4x16 running two sections
+grv_wood_privacy_34,gaps_in_pickets,Gaps in Pickets,ea,0,n/a,Style/layout note only — no material cost change. App reduces picket count ~15%.
+grv_wood_privacy_cedar,board_on_board,Board on Board,ea,5.95,SDA,Same cedar picket EA cost as base product (SDA1590)
+grv_wood_privacy_cedar,lattice_top,Lattice Top,ea,?,?,Cost per 4x8 lattice panel — switches to 4ft cedar pickets ($5.95 EA)
+grv_wood_privacy_cedar,top_cap_fascia,Top Cap & Fascia,ea,?,?,Cedar or PT? Need cost per 2x6x8 cap board and fascia board
+grv_wood_horiz,board_on_board,Board on Board,ea,8.32,SDA,Same board EA cost as base product (SDA1233 — 8' 1X6 SQUARE TOP TREATED)
+grv_wood_ranch_3rail,wire_mesh,Wire Mesh,lf,?,?,Galvanized wire mesh behind rails — need $/lf and supplier (not in SDA wood file)
+grv_wood_privacy_8ft,board_on_board,Board on Board,ea,6.63,SDA,Same picket EA cost as 8ft base product (SDA1238)
+grv_wood_privacy_8ft,top_cap_fascia,Top Cap & Fascia,ea,?,?,1x4x16 running two sections — need board cost from SDA
+grv_vinyl_privacy,color_upgrade,Color Upgrade,lf,3.52,CAT,Upcharge per LF for color over white base
+grv_vinyl_privacy,lattice_top,Lattice Top Panel,ea,30.22,CAT,Lattice top kit per panel (CAT)
+grv_vinyl_privacy,gate_walk,Walk Gate,kit,314.88,CAT,Prefab kit — fixed cost per gate
+grv_vinyl_privacy,gate_double,Double Drive Gate,kit,346.36,CAT,Prefab kit — fixed cost per gate
+grv_alum_4ft,gate_walk,Walk Gate,kit,?,?,Prefab kit — fixed cost per gate
+grv_alum_4ft,gate_double,Double Drive Gate,kit,?,?,Prefab kit — fixed cost per gate
+grv_chainlink_4ft,black_vinyl_upgrade,Black Vinyl Coated Mesh,lf,?,?,Upcharge per LF over galvanized base cost
+grv_chainlink_4ft,barb_wire,Barb Wire,lf,?,?,Cost per LF
+grv_chainlink_4ft,privacy_slats,Privacy Slats,lf,?,?,Cost per LF
+grv_chainlink_4ft,gate_walk,Walk Gate,kit,?,?,Prefab kit — fixed cost per gate
+grv_chainlink_4ft,gate_double,Double Drive Gate,kit,?,?,Prefab kit — fixed cost per gate
