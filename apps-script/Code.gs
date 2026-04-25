@@ -237,6 +237,99 @@ function getCurrentUserEmail() {
   return Session.getActiveUser().getEmail();
 }
 
+// ── One-time setup: create Products + Addons tabs with GRV data ───
+// Run this once from the Apps Script editor (Run > setupGRVProductsAndAddons)
+// Safe to re-run — it skips creation if the tab already exists and has data.
+
+function setupGRVProductsAndAddons() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  // ── Products ──────────────────────────────────────────────────────
+  const PRODUCT_HEADERS = [
+    'branch','material','product_id','product_name','style_template',
+    'section_length_ft','heights_ft','infill_desc','infill_dim',
+    'infill_units_per_section','infill_cost_ea','infill_supplier',
+    'rail_desc','rail_dim','rails_per_section','rail_cost_ea','rail_supplier',
+    'post_size','post_cost_6ft_post','post_cost_8ft_post','post_supplier',
+    'gate_post_size','gate_post_cost_8ft','gate_post_cost_10ft','gate_post_supplier',
+    'labor_per_lf','notes'
+  ];
+
+  const PRODUCTS = [
+    ['GRV','wood','grv_wood_privacy_58','Dog Ear Privacy 5/8"','privacy_picket',8,'6','Dog Ear Picket Treated Pine','5/8"x6"x6\'','',2.81,'SDA','2x4x8 Rail Treated Pine','2x4x8',3,5.71,'SDA','4x4x8','',10.99,'SDA','6x6x8',35.21,45.86,'SDA','','SDA1237 picket; SDA1143 rail; SDA1030 post; SDA1045/SDA1046 gate posts'],
+    ['GRV','wood','grv_wood_privacy_34','Dog Ear Privacy 3/4"','privacy_picket',8,'6','Dog Ear Picket Treated Pine','3/4"x6"x6\'','','','','2x4x8 Rail Treated Pine','2x4x8',3,5.71,'SDA','4x4x8','',10.99,'SDA','6x6x8',35.21,45.86,'SDA','','3/4" picket not priced — confirm SKU with SDA'],
+    ['GRV','wood','grv_wood_privacy_cedar','Dog Ear Privacy Cedar','privacy_picket',8,'6','Dog Ear Picket Cedar','5/8"x6"x6\'','',5.95,'SDA','2x4x8 Rail Cedar','2x4x8',2,13.98,'SDA','4x4x8','',10.99,'SDA','6x6x8',35.21,45.86,'SDA','','SDA1590 cedar picket; SDA1137 cedar rail; PT Pine posts'],
+    ['GRV','wood','grv_wood_horiz','Horizontal Privacy 6ft','horizontal_board',8,'6','1x6 Horizontal Board','1x6x8',13,8.32,'SDA','Cap Board built into style','2x6x8','','','','4x4x8','',10.99,'SDA','6x6x8',35.21,45.86,'SDA','','SDA1233 board; 2x6x8 cap board cost TBD'],
+    ['GRV','wood','grv_wood_ranch_3rail','Ranch Rail 3 Rail','split_rail',11,'4','Split Rail','4"x4"x11\'',3,'','','','4"x4"x11\'','','','','4x4x6','','','','4x6x6','','','','','Split rail not in SDA — need separate supplier'],
+    ['GRV','wood','grv_wood_privacy_8ft','Dog Ear Privacy 8ft','privacy_picket',8,'8','Dog Ear Picket Treated Pine','5/8"x6"x8\'','',6.63,'SDA','2x4x8 Rail Treated Pine','2x4x8',4,5.71,'SDA','4x6x10','','','','6x6x10',45.86,45.22,'SDA','','SDA1238 picket; 4x6x10 line post cost TBD'],
+    ['GRV','vinyl','grv_vinyl_privacy','Vinyl Privacy 6ft','panel',8,'6','Privacy Panel','6ft x 8ft panel',1,179.10,'CAT','','','','','','5x5x8','',34.44,'CAT','5x5x8',34.44,'','','','WHITE NEWBURY ELEMENT RESV QQ panel (CAT)'],
+    ['GRV','aluminum','grv_alum_4ft','Aluminum Flat Top 4ft','panel',6,'4','Aluminum Panel','4ft x 6ft panel',1,'','','','','','','','2x2x6','','','','2x2x6','','','','','Need aluminum supplier pricing'],
+    ['GRV','chainlink','grv_chainlink_4ft','Chain Link 4ft','mesh',10,'4','Galvanized Mesh','11.5ga','per_lf','','','Top Rail','1-3/8" x 21ft','1 per 21ft','','','steel','','','','','','','','','Need chain link supplier pricing'],
+  ];
+
+  let prodSheet = ss.getSheetByName(SHEET_PRODUCTS);
+  if (!prodSheet) {
+    prodSheet = ss.insertSheet(SHEET_PRODUCTS);
+  }
+  if (prodSheet.getLastRow() === 0) {
+    prodSheet.appendRow(PRODUCT_HEADERS);
+  }
+  const existingIds = prodSheet.getLastRow() > 1
+    ? prodSheet.getRange(2, 3, prodSheet.getLastRow() - 1, 1).getValues().flat()
+    : [];
+  PRODUCTS.forEach(row => {
+    if (!existingIds.includes(row[2])) prodSheet.appendRow(row);
+  });
+
+  // ── Addons ────────────────────────────────────────────────────────
+  const ADDON_HEADERS = ['product_id','addon_key','addon_label','cost_type','cost_value','supplier','notes'];
+
+  const ADDONS = [
+    ['grv_wood_privacy_58','board_on_board','Board on Board','ea',2.81,'SDA','Same picket EA cost as base product — app adds 70% more pickets'],
+    ['grv_wood_privacy_58','lattice_top','Lattice Top','ea','','','Cost per 4x8 lattice panel — switches to 4ft pickets ($2.81 EA)'],
+    ['grv_wood_privacy_58','top_cap_fascia','Top Cap & Fascia','ea','','','1x4x16 running two sections — need board cost from SDA'],
+    ['grv_wood_privacy_58','gaps_in_pickets','Gaps in Pickets','ea',0,'n/a','Style/layout note only — no material cost change'],
+    ['grv_wood_privacy_34','board_on_board','Board on Board','ea','','','Same picket EA cost as base product — confirm 3/4" picket SKU'],
+    ['grv_wood_privacy_34','lattice_top','Lattice Top','ea','','','Cost per 4x8 lattice panel — switches to 4ft pickets'],
+    ['grv_wood_privacy_34','top_cap_fascia','Top Cap & Fascia','ea','','','1x4x16 running two sections'],
+    ['grv_wood_privacy_34','gaps_in_pickets','Gaps in Pickets','ea',0,'n/a','Style/layout note only — no material cost change'],
+    ['grv_wood_privacy_cedar','board_on_board','Board on Board','ea',5.95,'SDA','Same cedar picket EA cost as base product (SDA1590)'],
+    ['grv_wood_privacy_cedar','lattice_top','Lattice Top','ea','','','Cost per 4x8 lattice panel — switches to 4ft cedar pickets ($5.95 EA)'],
+    ['grv_wood_privacy_cedar','top_cap_fascia','Top Cap & Fascia','ea','','','Cedar or PT? Need cost per 2x6x8 cap board and fascia board'],
+    ['grv_wood_horiz','board_on_board','Board on Board','ea',8.32,'SDA','Same board EA cost as base product (SDA1233)'],
+    ['grv_wood_ranch_3rail','wire_mesh','Wire Mesh','lf','','','Galvanized wire mesh behind rails — need $/lf and supplier'],
+    ['grv_wood_privacy_8ft','board_on_board','Board on Board','ea',6.63,'SDA','Same picket EA cost as 8ft base product (SDA1238)'],
+    ['grv_wood_privacy_8ft','top_cap_fascia','Top Cap & Fascia','ea','','','1x4x16 running two sections — need board cost from SDA'],
+    ['grv_vinyl_privacy','color_upgrade','Color Upgrade','lf',3.52,'CAT','Upcharge per LF for color over white base'],
+    ['grv_vinyl_privacy','lattice_top','Lattice Top Panel','ea',30.22,'CAT','Lattice top kit per panel (CAT)'],
+    ['grv_vinyl_privacy','gate_walk','Walk Gate','kit',314.88,'CAT','Prefab kit — fixed cost per gate'],
+    ['grv_vinyl_privacy','gate_double','Double Drive Gate','kit',346.36,'CAT','Prefab kit — fixed cost per gate'],
+    ['grv_alum_4ft','gate_walk','Walk Gate','kit','','','Prefab kit — fixed cost per gate'],
+    ['grv_alum_4ft','gate_double','Double Drive Gate','kit','','','Prefab kit — fixed cost per gate'],
+    ['grv_chainlink_4ft','black_vinyl_upgrade','Black Vinyl Coated Mesh','lf','','','Upcharge per LF over galvanized base cost'],
+    ['grv_chainlink_4ft','barb_wire','Barb Wire','lf','','','Cost per LF'],
+    ['grv_chainlink_4ft','privacy_slats','Privacy Slats','lf','','','Cost per LF'],
+    ['grv_chainlink_4ft','gate_walk','Walk Gate','kit','','','Prefab kit — fixed cost per gate'],
+    ['grv_chainlink_4ft','gate_double','Double Drive Gate','kit','','','Prefab kit — fixed cost per gate'],
+  ];
+
+  let addonSheet = ss.getSheetByName(SHEET_ADDONS);
+  if (!addonSheet) {
+    addonSheet = ss.insertSheet(SHEET_ADDONS);
+  }
+  if (addonSheet.getLastRow() === 0) {
+    addonSheet.appendRow(ADDON_HEADERS);
+  }
+  const existingAddonKeys = addonSheet.getLastRow() > 1
+    ? addonSheet.getRange(2, 1, addonSheet.getLastRow() - 1, 2).getValues().map(r => r[0] + '|' + r[1])
+    : [];
+  ADDONS.forEach(row => {
+    if (!existingAddonKeys.includes(row[0] + '|' + row[1])) addonSheet.appendRow(row);
+  });
+
+  Logger.log('Done — Products rows: ' + prodSheet.getLastRow() + ', Addons rows: ' + addonSheet.getLastRow());
+}
+
 // ── Helpers ───────────────────────────────────────────────────────
 
 function jsonResponse(obj) {
