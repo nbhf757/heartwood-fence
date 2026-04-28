@@ -189,7 +189,7 @@ https://docs.google.com/spreadsheets/d/  THIS_PART_HERE  /edit
 3. Settings:
    - **Description:** Heartwood Fence Backend v1
    - **Execute as:** Me
-   - **Who has access:** Anyone with Google account *(or "Anyone" if reps don't have Google accounts)*
+   - **Who has access:** Anyone  ← MUST be "Anyone" (NOT "Anyone with Google account" — that setting causes fetch requests to get a login redirect instead of JSON)
 4. Click **Deploy**
 5. **Copy the Web App URL** — it looks like:
    ```

@@ -178,7 +178,7 @@ function logBOM(payload) {
       payload.height         || '',
       payload.linearFt       || 0,
       payload.soldPrice      || 0,
-      payload.suggestedPrice || 0,
+      payload.suggestedSell  || 0,
       payload.floorPrice     || 0,
       payload.notes          || '',
       JSON.stringify(payload.bom || []),
