@@ -3382,7 +3382,8 @@ function buildBOM(){
       add('Cap Board',prod.rail_desc,secs*(prod.rails_per_section||1),'EA',prod.rail_cost_ea,prod.rail_supplier||'Local');
     }
     const pCst = hft<=4?(prod.post_cost_6ft||11.25):(prod.post_cost_8ft||12.60);
-    const derivedGP=(gWalk+gDbl+(gCustQ&&gCustW?gCustQ:0))*2;
+    // Walk gate: 1 swing post (latch side = standard line post). Double drive: 2 swing posts.
+    const derivedGP=gWalk*1+gDbl*2+(gCustQ&&gCustW?gCustQ:0)*2;
     const regPosts=Math.max(0,totalPosts-derivedGP);
     if(regPosts>0) add('Posts',`${prod.post_size||'4x4'}x${hft<=4?6:8} Post`,regPosts,'EA',pCst,prod.post_supplier||'Local');
     add('Concrete','Concrete 80lb Bag',totalPosts*concBagsPerPost,'BAG',5.98,'The Home Depot');
