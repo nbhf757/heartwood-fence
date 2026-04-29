@@ -1475,15 +1475,14 @@ const FALLBACK_PRODUCTS = [
     ],
   },
   { branch:'CIN', product_id:'cin_wood_horiz_cap', product_name:'Horizontal Privacy with Cap',
-    material:'wood', style_template:'horizontal_board', section_length_ft:8, heights_ft:['6 ft'],
-    infill_desc:'1x6 Horizontal Board', infill_dim:'1x6x8', infill_units_per_section:13,
-    infill_cost_ea:6.58, infill_supplier:'Mills',
-    rail_desc:'Cap Board — top of section', rail_dim:'2x6x8', rails_per_section:1, rail_cost_ea:6.58, rail_supplier:'Mills',
+    material:'wood', style_template:'horizontal_board', section_length_ft:6, heights_ft:['6 ft'],
+    infill_desc:'1x6 Horizontal Board', infill_dim:'1x6x12', infill_units_per_section:6.5,
+    infill_cost_ea:9.25, infill_supplier:'Home Depot',
     post_size:'4x4', post_cost_8ft:11.25, post_supplier:'Mills',
     gate_post_size:'6x6', gate_post_cost_8ft:25.00, gate_post_supplier:'Mills',
     labor_per_lf:8,
     addons:[
-      {key:'board_on_board',label:'Board on Board', cost_type:'ea', cost_value:6.58, supplier:'Mills'},
+      {key:'cap_board', label:'Cap Board', cost_type:'ea', cost_value:9.25, supplier:'Home Depot'},
     ],
   },
   { branch:'CIN', product_id:'cin_wood_ky_3rail', product_name:'Kentucky Board — 3 Rail',
@@ -3395,6 +3394,10 @@ function buildBOM(){
     if(state.addons.has('board_on_board')){
       const ba=prod.addons?.find(a=>a.key==='board_on_board');
       if(ba) add('Add-On','Extra Boards for Board on Board',secs,'EA',ba.cost_value,ba.supplier||'Local');
+    }
+    if(state.addons.has('cap_board')){
+      const ca=prod.addons?.find(a=>a.key==='cap_board');
+      add('Add-On',`${prod.infill_dim||'1x6x12'} Cap Board`,Math.ceil(secs/2),'EA',ca?.cost_value||9.25,ca?.supplier||'Home Depot');
     }
     if(derivedGP>0){
       const gPC=prod.gate_post_cost_8ft||prod.post_cost_6ft||11.25;
