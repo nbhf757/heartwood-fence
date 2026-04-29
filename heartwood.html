@@ -1541,7 +1541,7 @@ const FALLBACK_PRODUCTS = [
     uchannel_count:2, uchannel_cost:1.44,
     tekscrew_count:10, tekscrew_cost:0.17,
     post_size:'5x5', post_cost_ea:23.63, post_supplier:'Imperial Fence',
-    cap_cost:1.02,
+    cap_cost:1.02, color_multiplier:1.649,
     labor_per_lf:7,
     addons:[
       {key:'color_upgrade', label:'Color Upgrade',      cost_type:'lf',  cost_value:0,      supplier:'Imperial Fence'},
@@ -1849,12 +1849,13 @@ function computeMatPerLf(prod){
   if(st==='horizontal_board'||st==='split_rail') return ((prod.infill_units_per_section||3)*(prod.infill_cost_ea||0))/sl;
   if(st==='panel')           return (prod.infill_cost_ea||0)/sl;
   if(st==='vinyl_component'){
-    const compCost=(prod.picket_count||13)*(prod.picket_cost||4.46)
+    const cMult=state.addons?.has('color_upgrade')?(prod.color_multiplier||1.649):1;
+    const compCost=((prod.picket_count||13)*(prod.picket_cost||4.46)
       +(prod.rail_count||2)*(prod.rail_cost||11.61)
       +(prod.insert_cost||8.89)
-      +(prod.uchannel_count||2)*(prod.uchannel_cost||1.44)
+      +(prod.uchannel_count||2)*(prod.uchannel_cost||1.44))*cMult
       +(prod.tekscrew_count||10)*(prod.tekscrew_cost||0.17);
-    const postCostPerSec=2*(prod.post_cost_ea||23.63)+2*(prod.cap_cost||1.02);
+    const postCostPerSec=2*(prod.post_cost_ea||23.63)*cMult+2*(prod.cap_cost||1.02);
     return (compCost+postCostPerSec)/sl;
   }
   if(st==='vinyl_horizontal') return ((prod.infill_units_per_section||prod.rails_per_section||3)*(prod.infill_cost_ea||0))/sl;
@@ -3455,24 +3456,25 @@ function buildBOM(){
 
   // ══ STYLE: vinyl_component (component-level vinyl build) ═
   } else if(st==='vinyl_component'){
-    const sup = prod.infill_supplier||'Imperial Fence';
-    const pSup = prod.post_supplier||sup;
-    add('Pickets',`${prod.picket_dim||'62.5"H'} Vinyl Picket`,secs*(prod.picket_count||13),'EA',prod.picket_cost||4.46,sup);
-    add('Rails',`${prod.rail_dim||'95"W'} Pocket Rail`,secs*(prod.rail_count||2),'EA',prod.rail_cost||11.61,sup);
-    add('Hardware','Steel Pocket Rail Insert',secs,'EA',prod.insert_cost||8.89,sup);
-    add('Hardware','U-Channel',secs*(prod.uchannel_count||2),'EA',prod.uchannel_cost||1.44,sup);
+    const sup    = prod.infill_supplier||'Imperial Fence';
+    const pSup   = prod.post_supplier||sup;
+    const cMult  = state.addons.has('color_upgrade') ? (prod.color_multiplier||1.649) : 1;
+    const picketCost = (prod.picket_cost||4.46)*cMult;
+    const railCost   = (prod.rail_cost||11.61)*cMult;
+    const insertCost = (prod.insert_cost||8.89)*cMult;
+    const uChanCost  = (prod.uchannel_cost||1.44)*cMult;
+    const postCst    = (prod.post_cost_ea||23.63)*cMult;
+    add('Pickets',`${prod.picket_dim||'62.5"H'} Vinyl Picket`,secs*(prod.picket_count||13),'EA',picketCost,sup);
+    add('Rails',`${prod.rail_dim||'95"W'} Pocket Rail`,secs*(prod.rail_count||2),'EA',railCost,sup);
+    add('Hardware','Steel Pocket Rail Insert',secs,'EA',insertCost,sup);
+    add('Hardware','U-Channel',secs*(prod.uchannel_count||2),'EA',uChanCost,sup);
     add('Hardware','Tek Screws',secs*(prod.tekscrew_count||10),'EA',prod.tekscrew_cost||0.17,sup);
-    const pCst = prod.post_cost_ea||23.63;
-    add('Posts',`${prod.post_size||'5x5'} Vinyl Post`,linePosts,'EA',pCst,pSup);
-    add('Posts',`${prod.post_size||'5x5'} Vinyl End/Terminal Post`,totalTerminal,'EA',pCst,pSup);
-    if(corners>0) add('Posts',`${prod.post_size||'5x5'} Vinyl Corner Post`,corners,'EA',pCst,pSup);
+    add('Posts',`${prod.post_size||'5x5'} Vinyl Post`,linePosts,'EA',postCst,pSup);
+    add('Posts',`${prod.post_size||'5x5'} Vinyl End/Terminal Post`,totalTerminal,'EA',postCst,pSup);
+    if(corners>0) add('Posts',`${prod.post_size||'5x5'} Vinyl Corner Post`,corners,'EA',postCst,pSup);
     add('Hardware','5"×5" Post Cap',totalPosts,'EA',prod.cap_cost||1.02,pSup);
     const digType=parseInt(document.getElementById('sel-dig').value)||0;
     if(digType===0||digType===1) add('Concrete','Concrete 80lb Bag',totalPosts*concBagsPerPost,'BAG',5.98,'The Home Depot');
-    if(state.addons.has('color_upgrade')){
-      const ca=prod.addons?.find(a=>a.key==='color_upgrade');
-      add('Add-On','Color Upgrade',lf,'LF',ca?.cost_value||0,ca?.supplier||sup);
-    }
     if(state.addons.has('lattice_top')){
       const la=prod.addons?.find(a=>a.key==='lattice_top');
       add('Add-On','Lattice Top Panel',secs,'EA',la?.cost_value||25,la?.supplier||sup);
