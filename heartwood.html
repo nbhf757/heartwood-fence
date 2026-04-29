@@ -1533,14 +1533,21 @@ const FALLBACK_PRODUCTS = [
   },
   // ══ CIN VINYL ════════════════════════════════════════════
   { branch:'CIN', product_id:'cin_vinyl_privacy', product_name:'Vinyl Privacy — 6ft',
-    material:'vinyl', style_template:'panel', section_length_ft:8, heights_ft:['6 ft'],
-    infill_desc:'Privacy Panel — 6ft × 8ft', infill_cost_ea:100.00, infill_supplier:'SPS',
-    post_size:'5x5 vinyl', post_cost_8ft:25.00, post_supplier:'SPS',
+    material:'vinyl', style_template:'vinyl_component', section_length_ft:8, heights_ft:['6 ft'],
+    infill_supplier:'Imperial Fence',
+    picket_count:13, picket_dim:'62.5"H', picket_cost:4.46,
+    rail_count:2,    rail_dim:'95"W Pocket Rail', rail_cost:11.61,
+    insert_cost:8.89,
+    uchannel_count:2, uchannel_cost:1.44,
+    tekscrew_count:10, tekscrew_cost:0.17,
+    post_size:'5x5', post_cost_ea:23.63, post_supplier:'Imperial Fence',
+    cap_cost:1.02,
     labor_per_lf:7,
     addons:[
-      {key:'lattice_top',   label:'Lattice Top Panel', cost_type:'ea',  cost_value:25.00, supplier:'Lowes'},
-      {key:'gate_walk',     label:'Walk Gate',         cost_type:'kit', cost_value:300.00, supplier:'SPS'},
-      {key:'gate_double',   label:'Double Drive Gate', cost_type:'kit', cost_value:600.00, supplier:'SPS'},
+      {key:'color_upgrade', label:'Color Upgrade',      cost_type:'lf',  cost_value:0,      supplier:'Imperial Fence'},
+      {key:'lattice_top',   label:'Lattice Top Panel',  cost_type:'ea',  cost_value:25.00,  supplier:'Lowes'},
+      {key:'gate_walk',     label:'Walk Gate',          cost_type:'kit', cost_value:300.00, supplier:'SPS'},
+      {key:'gate_double',   label:'Double Drive Gate',  cost_type:'kit', cost_value:600.00, supplier:'SPS'},
     ],
   },
   { branch:'CIN', product_id:'cin_vinyl_ranchrail', product_name:'Vinyl Ranch Rail — 3 Rail',
@@ -1841,6 +1848,15 @@ function computeMatPerLf(prod){
   }
   if(st==='horizontal_board'||st==='split_rail') return ((prod.infill_units_per_section||3)*(prod.infill_cost_ea||0))/sl;
   if(st==='panel')           return (prod.infill_cost_ea||0)/sl;
+  if(st==='vinyl_component'){
+    const compCost=(prod.picket_count||13)*(prod.picket_cost||4.46)
+      +(prod.rail_count||2)*(prod.rail_cost||11.61)
+      +(prod.insert_cost||8.89)
+      +(prod.uchannel_count||2)*(prod.uchannel_cost||1.44)
+      +(prod.tekscrew_count||10)*(prod.tekscrew_cost||0.17);
+    const postCostPerSec=2*(prod.post_cost_ea||23.63)+2*(prod.cap_cost||1.02);
+    return (compCost+postCostPerSec)/sl;
+  }
   if(st==='vinyl_horizontal') return ((prod.infill_units_per_section||prod.rails_per_section||3)*(prod.infill_cost_ea||0))/sl;
   if(st==='mesh')            return prod.infill_cost_ea||0; // mesh is $/lf
   return 0;
@@ -3436,6 +3452,36 @@ function buildBOM(){
       if(gWalk) add('Gates','Walk Gate — Split Rail',gWalk,'EA',gr.walk,gPS);
       if(gDbl)  add('Gates','Double Drive Gate — Split Rail',gDbl,'EA',gr.dbl,gPS);
     }
+
+  // ══ STYLE: vinyl_component (component-level vinyl build) ═
+  } else if(st==='vinyl_component'){
+    const sup = prod.infill_supplier||'Imperial Fence';
+    const pSup = prod.post_supplier||sup;
+    add('Pickets',`${prod.picket_dim||'62.5"H'} Vinyl Picket`,secs*(prod.picket_count||13),'EA',prod.picket_cost||4.46,sup);
+    add('Rails',`${prod.rail_dim||'95"W'} Pocket Rail`,secs*(prod.rail_count||2),'EA',prod.rail_cost||11.61,sup);
+    add('Hardware','Steel Pocket Rail Insert',secs,'EA',prod.insert_cost||8.89,sup);
+    add('Hardware','U-Channel',secs*(prod.uchannel_count||2),'EA',prod.uchannel_cost||1.44,sup);
+    add('Hardware','Tek Screws',secs*(prod.tekscrew_count||10),'EA',prod.tekscrew_cost||0.17,sup);
+    const pCst = prod.post_cost_ea||23.63;
+    add('Posts',`${prod.post_size||'5x5'} Vinyl Post`,linePosts,'EA',pCst,pSup);
+    add('Posts',`${prod.post_size||'5x5'} Vinyl End/Terminal Post`,totalTerminal,'EA',pCst,pSup);
+    if(corners>0) add('Posts',`${prod.post_size||'5x5'} Vinyl Corner Post`,corners,'EA',pCst,pSup);
+    add('Hardware','5"×5" Post Cap',totalPosts,'EA',prod.cap_cost||1.02,pSup);
+    const digType=parseInt(document.getElementById('sel-dig').value)||0;
+    if(digType===0||digType===1) add('Concrete','Concrete 80lb Bag',totalPosts*concBagsPerPost,'BAG',5.98,'The Home Depot');
+    if(state.addons.has('color_upgrade')){
+      const ca=prod.addons?.find(a=>a.key==='color_upgrade');
+      add('Add-On','Color Upgrade',lf,'LF',ca?.cost_value||0,ca?.supplier||sup);
+    }
+    if(state.addons.has('lattice_top')){
+      const la=prod.addons?.find(a=>a.key==='lattice_top');
+      add('Add-On','Lattice Top Panel',secs,'EA',la?.cost_value||25,la?.supplier||sup);
+    }
+    const gr=gateRates();
+    const gWSup=prod.addons?.find(a=>a.key==='gate_walk'&&a.cost_type==='kit')?.supplier||pSup;
+    const gDSup=prod.addons?.find(a=>a.key==='gate_double'&&a.cost_type==='kit')?.supplier||pSup;
+    if(gWalk) add('Gates',`Walk Gate — ${prod.product_name}`,gWalk,'EA',gr.walk,gWSup);
+    if(gDbl)  add('Gates',`Double Drive Gate — ${prod.product_name}`,gDbl,'EA',gr.dbl,gDSup);
 
   // ══ STYLE: panel (vinyl or aluminum) ════════════════════
   } else if(st==='panel'){
