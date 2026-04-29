@@ -1565,13 +1565,18 @@ const FALLBACK_PRODUCTS = [
   },
   // ══ CIN ALUMINUM ═════════════════════════════════════════
   { branch:'CIN', product_id:'cin_alum_4ft', product_name:'Aluminum Flat Top — 4ft',
-    material:'aluminum', style_template:'panel', section_length_ft:6, heights_ft:['4 ft'],
-    infill_desc:'Aluminum Panel — 4ft × 6ft', infill_cost_ea:64.00, infill_supplier:'SPS',
-    post_size:'2x2 aluminum', post_cost_6ft:18.00, post_supplier:'SPS',
+    material:'aluminum', style_template:'alum_component', section_length_ft:6, heights_ft:['4 ft'],
+    infill_desc:'4x6 Aluminum Flat Top Panel', infill_cost_ea:65.77, infill_supplier:'Imperial Fence',
+    post_size:'2x2x72"', post_cost_ea:20.45, post_supplier:'Imperial Fence',
+    gate_post_cost_ea:37.79,
+    cap_cost:1.42,
+    hinge_pair_cost:40.85,
+    latch_lock_cost:60.00,
+    gate_panel_cost:194.21,
     labor_per_lf:5,
     addons:[
-      {key:'gate_walk',  label:'Walk Gate',         cost_type:'kit', cost_value:195.00, supplier:'SPS'},
-      {key:'gate_double',label:'Double Drive Gate', cost_type:'kit', cost_value:400.00, supplier:'SPS'},
+      {key:'gate_walk',  label:'Walk Gate',         cost_type:'kit', cost_value:295.06, supplier:'Imperial Fence'},
+      {key:'gate_double',label:'Double Drive Gate', cost_type:'kit', cost_value:530.12, supplier:'Imperial Fence'},
     ],
   },
   { branch:'CIN', product_id:'cin_alum_6ft', product_name:'Aluminum Flat Top — 6ft',
@@ -1857,6 +1862,12 @@ function computeMatPerLf(prod){
       +(prod.tekscrew_count||10)*(prod.tekscrew_cost||0.17);
     const postCostPerSec=2*(prod.post_cost_ea||23.63)*cMult+2*(prod.cap_cost||1.02);
     return (compCost+postCostPerSec)/sl;
+  }
+  if(st==='alum_component'){
+    const panelLf=(prod.infill_cost_ea||65.77)/sl;
+    const postLf=2*(prod.post_cost_ea||20.45)/sl;
+    const capLf=2*(prod.cap_cost||1.42)/sl;
+    return panelLf+postLf+capLf;
   }
   if(st==='vinyl_horizontal') return ((prod.infill_units_per_section||prod.rails_per_section||3)*(prod.infill_cost_ea||0))/sl;
   if(st==='mesh')            return prod.infill_cost_ea||0; // mesh is $/lf
@@ -3484,6 +3495,33 @@ function buildBOM(){
     const gDSup=prod.addons?.find(a=>a.key==='gate_double'&&a.cost_type==='kit')?.supplier||pSup;
     if(gWalk) add('Gates',`Walk Gate — ${prod.product_name}`,gWalk,'EA',gr.walk,gWSup);
     if(gDbl)  add('Gates',`Double Drive Gate — ${prod.product_name}`,gDbl,'EA',gr.dbl,gDSup);
+
+  // ══ STYLE: alum_component (component-level aluminum build) ═
+  } else if(st==='alum_component'){
+    const sup = prod.infill_supplier||'Imperial Fence';
+    const pSup = prod.post_supplier||sup;
+    // Panels
+    add('Panels',prod.infill_desc||'Aluminum Panel',secs,'EA',prod.infill_cost_ea||65.77,sup);
+    // Posts — hinge-side gate posts are heavier stock; latch side uses regular post
+    const hingeGP = gWalk*1 + gDbl*2 + (gCustQ&&gCustW?gCustQ:0)*1;
+    const regPosts = Math.max(0,totalPosts-hingeGP);
+    if(regPosts>0) add('Posts','2x2x72" Post (0.062") — Line/Corner/End',regPosts,'EA',prod.post_cost_ea||20.45,pSup);
+    if(hingeGP>0)  add('Posts','2x2x72" Gate Post (0.125") — Hinge Side',hingeGP,'EA',prod.gate_post_cost_ea||37.79,pSup);
+    add('Hardware','2x2 Post Cap',totalPosts,'EA',prod.cap_cost||1.42,pSup);
+    const digType=parseInt(document.getElementById('sel-dig').value)||0;
+    if(digType===0||digType===1) add('Concrete','Concrete 80lb Bag',totalPosts*concBagsPerPost,'BAG',5.98,'The Home Depot');
+    // Walk gates
+    if(gWalk>0){
+      add('Gates','5\'W×4\'H Pre-Built Aluminum Gate',gWalk,'EA',prod.gate_panel_cost||194.21,sup);
+      add('Gate Hardware','Self-Closing Hinge Pair',gWalk,'EA',prod.hinge_pair_cost||40.85,sup);
+      add('Gate Hardware','Latch + Lock',gWalk,'EA',prod.latch_lock_cost||60.00,sup);
+    }
+    // Double drive gates
+    if(gDbl>0){
+      add('Gates','5\'W×4\'H Pre-Built Aluminum Gate',gDbl*2,'EA',prod.gate_panel_cost||194.21,sup);
+      add('Gate Hardware','Self-Closing Hinge Pair',gDbl*2,'EA',prod.hinge_pair_cost||40.85,sup);
+      add('Gate Hardware','Latch + Lock',gDbl,'EA',prod.latch_lock_cost||60.00,sup);
+    }
 
   // ══ STYLE: panel (vinyl or aluminum) ════════════════════
   } else if(st==='panel'){
