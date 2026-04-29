@@ -10,10 +10,10 @@ cin_wood_privacy_cedar,board_on_board,Board on Board,ea,4.79,SPS,Same cedar pick
 cin_wood_privacy_cedar,lattice_top,Lattice Top,ea,25,Lowes,Cost per 4x8 lattice panel — app switches to 4ft cedar pickets ($4.79 EA)
 cin_wood_privacy_cedar,top_cap_fascia,Top Cap & Fascia,ea,10,?,Need: cost per 2x6x8 cedar cap board and fascia board — cedar or PT?
 cin_wood_horiz_cap,cap_board,Cap Board,ea,9.25,Home Depot,1x6x12 cap board — same material as fence; app uses ceil(sections/2) boards
-cin_wood_ky_3rail,wire_mesh,Wire Mesh,lf,4.66,Imperial Fence,Galvanized wire mesh behind rails — need $/lf and supplier
-cin_wood_ky_4rail,wire_mesh,Wire Mesh,lf,4.66,Imperial Fence,
-cin_wood_split_3rail,wire_mesh,Wire Mesh,lf,4.66,Imperial Fence,
-cin_wood_split_2rail,wire_mesh,Wire Mesh,lf,4.66,Imperial Fence,
+cin_wood_ky_3rail,wire_mesh,Wire Mesh,lf,1.06,Mills,
+cin_wood_ky_4rail,wire_mesh,Wire Mesh,lf,1.06,Mills,
+cin_wood_split_3rail,wire_mesh,Wire Mesh,lf,1.06,Mills,
+cin_wood_split_2rail,wire_mesh,Wire Mesh,lf,1.06,Mills,
 cin_vinyl_privacy,color_upgrade,Color Upgrade,lf,unknown,unknown,Can you use the multiplier from Virginia Beach's spreadsheet
 cin_vinyl_privacy,lattice_top,Lattice Top Panel,ea,25,Lowes,Cost per vinyl lattice top panel from SPS
 cin_vinyl_privacy,gate_walk,Walk Gate,kit,300,SPS,Prefab kit — fixed cost per gate

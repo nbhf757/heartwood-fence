@@ -1228,7 +1228,7 @@ const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzAEXFMWVLS2_yj
 const FALLBACK = {
   laborMin:500,opsFee:300,demoPerFt:3,matMarkup:0.015,salesTax:0.06,
   cogs200:0.62,cogs100:0.60,cogs50:0.58,cogsLt50:0.56,floorRate:0.67,
-  permitStd:75,permitLocal:170,permitConst:250,
+  permitStd:250,permitLocal:250,permitConst:250,
   concretePunch:25,coreDrill:50,surfaceMount:35,
   woodMatGood:10.314,woodMatBetter:13.702,woodMatBest:13.460,
   woodLaborGood:7,woodLaborBetter:7,woodLaborBest:7,woodFastener:0.25,
@@ -1487,46 +1487,48 @@ const FALLBACK_PRODUCTS = [
   },
   { branch:'CIN', product_id:'cin_wood_ky_3rail', product_name:'Kentucky Board — 3 Rail',
     material:'wood', style_template:'horizontal_board', section_length_ft:8, heights_ft:['4 ft'],
-    infill_desc:'2x6 Board', infill_dim:'2x6x8', infill_units_per_section:3,
-    infill_cost_ea:5.80, infill_supplier:'Mills',
+    infill_desc:'1x6 Board', infill_dim:'1x6x16', infill_units_per_section:1.5,
+    infill_cost_ea:11.50, infill_supplier:'Mills',
+    faceboard_cost_ea:11.50, faceboard_supplier:'Mills', faceboard_posts_per_board:4,
     post_size:'4x4', post_cost_6ft:11.25, post_supplier:'Mills',
     gate_post_size:'4x6', gate_post_cost_8ft:11.25, gate_post_supplier:'Mills',
     labor_per_lf:8,
     addons:[
-      {key:'wire_mesh',label:'Wire Mesh', cost_type:'lf', cost_value:2.00, supplier:'Imperial Fence'},
+      {key:'wire_mesh',label:'Wire Mesh', cost_type:'lf', cost_value:1.06, supplier:'Mills'},
     ],
   },
   { branch:'CIN', product_id:'cin_wood_ky_4rail', product_name:'Kentucky Board — 4 Rail',
     material:'wood', style_template:'horizontal_board', section_length_ft:8, heights_ft:['4 ft'],
     infill_desc:'1x6 Board', infill_dim:'1x6x16', infill_units_per_section:2,
     infill_cost_ea:11.50, infill_supplier:'Mills',
+    faceboard_cost_ea:11.50, faceboard_supplier:'Mills', faceboard_posts_per_board:4,
     post_size:'4x4', post_cost_6ft:11.25, post_supplier:'Mills',
     gate_post_size:'4x6', gate_post_cost_8ft:11.25, gate_post_supplier:'Mills',
     labor_per_lf:8,
     addons:[
-      {key:'wire_mesh',label:'Wire Mesh', cost_type:'lf', cost_value:2.00, supplier:'Imperial Fence'},
+      {key:'wire_mesh',label:'Wire Mesh', cost_type:'lf', cost_value:1.06, supplier:'Mills'},
     ],
   },
   { branch:'CIN', product_id:'cin_wood_split_3rail', product_name:'Split Rail — 3 Rail',
     material:'wood', style_template:'split_rail', section_length_ft:11, heights_ft:['4 ft'],
     infill_desc:'Split Rail', infill_dim:'4"x4"x11\'', infill_units_per_section:3,
     infill_cost_ea:13.60, infill_supplier:'Mills',
-    post_size:'4x4', post_cost_6ft:11.25, post_supplier:'Mills',
+    post_size:'7\' Mortise', post_cost_6ft:24.50, post_supplier:'Mills',
     gate_post_size:'4x6', gate_post_cost_8ft:11.25, gate_post_supplier:'Mills',
     labor_per_lf:8,
     addons:[
-      {key:'wire_mesh',label:'Wire Mesh', cost_type:'lf', cost_value:2.00, supplier:'Imperial Fence'},
+      {key:'wire_mesh',label:'Wire Mesh', cost_type:'lf', cost_value:1.06, supplier:'Mills'},
     ],
   },
   { branch:'CIN', product_id:'cin_wood_split_2rail', product_name:'Split Rail — 2 Rail',
     material:'wood', style_template:'split_rail', section_length_ft:11, heights_ft:['4 ft'],
     infill_desc:'Split Rail', infill_dim:'4"x4"x11\'', infill_units_per_section:2,
     infill_cost_ea:13.60, infill_supplier:'Mills',
-    post_size:'4x4', post_cost_6ft:11.25, post_supplier:'Mills',
+    post_size:'7\' Mortise', post_cost_6ft:24.50, post_supplier:'Mills',
     gate_post_size:'4x6', gate_post_cost_8ft:11.25, gate_post_supplier:'Mills',
     labor_per_lf:8,
     addons:[
-      {key:'wire_mesh',label:'Wire Mesh', cost_type:'lf', cost_value:2.00, supplier:'Imperial Fence'},
+      {key:'wire_mesh',label:'Wire Mesh', cost_type:'lf', cost_value:1.06, supplier:'Mills'},
     ],
   },
   // ══ CIN VINYL ════════════════════════════════════════════
@@ -1834,7 +1836,7 @@ function cogsRate(lf){ return lf>200?P.cogs200:lf>100?P.cogs100:lf>50?P.cogs50:P
 function computeMatPerLf(prod){
   const st=prod.style_template, sl=prod.section_length_ft||8;
   if(st==='privacy_picket'){
-    const pickPerLf=(12/5.5)*1.05;
+    const pickPerLf=(12/5.5)*1.02;
     return pickPerLf*(prod.infill_cost_ea||0)+((prod.rails_per_section||3)*(prod.rail_cost_ea||0))/sl;
   }
   if(st==='horizontal_board'||st==='split_rail') return ((prod.infill_units_per_section||3)*(prod.infill_cost_ea||0))/sl;
@@ -1848,7 +1850,7 @@ function addonCostPerLf(a, secLen){
   if(a.cost_type==='p_key'){ const arr=P[a.p_key]; return Array.isArray(arr)?(arr[a.p_idx]||0):0; }
   if(a.cost_type==='lf')   return a.cost_value||0;
   if(a.cost_type==='ea'){
-    if(a.key==='board_on_board')  return (a.cost_value||0)*(12/5.5)*1.05*0.70;
+    if(a.key==='board_on_board')  return (a.cost_value||0)*(12/5.5)*1.02*0.70;
     if(a.key==='lattice_top')     return (a.cost_value||0)/(2*(secLen||8));
     if(a.key==='top_cap_fascia')  return (a.cost_value||0)*2/(2*(secLen||8));
     if(a.key==='gaps_in_pickets') return 0;
@@ -3284,7 +3286,7 @@ function buildBOM(){
   // ── Shared helper: wood gate materials (Z-frame cedar, pickets, hardware) ──
   function addWoodGates(picketDesc, picketCost, picketSup, derivedGatePosts, gPostCost, gPostSup, gPostLabel){
     if(derivedGatePosts>0) add('Gate Posts', gPostLabel, derivedGatePosts, 'EA', gPostCost, gPostSup);
-    const cedarFrm=5.50, pickPerFt=(12/5.5)*1.05;
+    const cedarFrm=5.50, pickPerFt=(12/5.5)*1.02;
     if(gWalk>0){
       const fb=Math.ceil((8+2*hft+Math.hypot(4,hft))/8);
       add('Gate Frame','2x4x8 Frame Board — Cedar',gWalk*fb,'EA',cedarFrm,'Local Lumber Co');
@@ -3319,7 +3321,8 @@ function buildBOM(){
     const picketLen  = hasLattice ? Math.max(hft-2,4) : hft;
     const pCost      = hasLattice ? pCostShort : pCostFull;
     const pDesc      = `${pDim}x${picketLen}' ${prod.infill_desc||'Dog Ear Picket'}`;
-    const pickPerFt  = (12/5.5)*1.05;
+    const gapsAdj    = state.addons.has('gaps_in_pickets') ? 0.85 : 1.0;
+    const pickPerFt  = (12/5.5)*1.02*gapsAdj;
     const totalPick  = Math.ceil(lf*pickPerFt);
     const postUpgSel = parseInt(document.getElementById('sel-post').value)||0;
 
@@ -3343,14 +3346,13 @@ function buildBOM(){
     const regPosts  = Math.max(0, totalPosts-derivedGP);
     if(regPosts>0) add('Posts',`${pSize}x${pLen} Post — Treated Pine`,regPosts,'EA',linPostCost,prod.post_supplier||'Decks & Docks');
     add('Concrete','Concrete 80lb Bag',totalPosts*concBagsPerPost,'BAG',5.98,'The Home Depot');
-    const screwBoxes=Math.ceil(lf/50);
-    add('Fasteners','Wood Screws 1lb/124ct — 1 5/8"',screwBoxes,'BOX',10.97,'The Home Depot');
-    add('Fasteners','Nails — subcontractor allowance',1,'ALLOW',Math.round(0.25*lf*100)/100,'Subcontractor');
+    add('Fasteners','Nails / Screws — subcontractor allowance',1,'ALLOW',Math.round(0.25*lf*100)/100,'Subcontractor');
 
     // Add-ons
     if(hasLattice){
       const la=prod.addons?.find(a=>a.key==='lattice_top');
       add('Add-On','4x8 Lattice Panel (cut to 2ft height)',Math.ceil(secs/2),'EA',la?.cost_value||18,la?.supplier||'The Home Depot');
+      add('Add-On','Grooved 2x4x8 Lattice Frame Board',Math.ceil(secs/2)*2,'EA',12.00,'The Home Depot');
     }
     if(state.addons.has('top_cap_fascia')){
       const ta=prod.addons?.find(a=>a.key==='top_cap_fascia');
@@ -3398,6 +3400,10 @@ function buildBOM(){
     if(state.addons.has('cap_board')){
       const ca=prod.addons?.find(a=>a.key==='cap_board');
       add('Add-On',`${prod.infill_dim||'1x6x12'} Cap Board`,Math.ceil(secs/2),'EA',ca?.cost_value||9.25,ca?.supplier||'Home Depot');
+    }
+    if(prod.faceboard_cost_ea){
+      const fbPerBoard = prod.faceboard_posts_per_board||4;
+      add('Faceboards',`${prod.infill_dim||'1x6x16'} Faceboard`,Math.ceil(totalPosts/fbPerBoard),'EA',prod.faceboard_cost_ea,prod.faceboard_supplier||prod.infill_supplier||'Mills');
     }
     if(derivedGP>0){
       const gPC=prod.gate_post_cost_8ft||prod.post_cost_6ft||11.25;
