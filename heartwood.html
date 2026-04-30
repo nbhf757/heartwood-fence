@@ -1610,6 +1610,7 @@ const FALLBACK_PRODUCTS = [
     post_supplier:'Master Halco',
     labor_per_lf:9,
     addons:[
+      {key:'bottom_wire',      label:'Bottom Tension Wire',cost_type:'lf',  cost_value:0.09,   supplier:'Master Halco'},
       {key:'barb_wire',        label:'Barbed Wire',        cost_type:'lf',  cost_value:0,      supplier:'TBD'},
       {key:'privacy_slats',    label:'Privacy Slats',      cost_type:'lf',  cost_value:0,      supplier:'TBD'},
       {key:'black_vinyl_mesh', label:'Black Vinyl Upgrade',cost_type:'lf',  cost_value:0,      supplier:'Master Halco'},
@@ -3670,9 +3671,13 @@ function buildBOM(){
     add('Posts',`1 5/8"×${termH}ft Line Post`,linePosts,'EA',lineCost,pSup);
     add('Hardware','Dome Cap (Terminal Post)',termPosts,'EA',prod.dome_cap_cost||2.16,pSup);
     add('Hardware','Loop Cap (Line Post)',linePosts,'EA',prod.loop_cap_cost||2.37,pSup);
-    add('Hardware','Tension Band',termPosts*4,'EA',prod.tension_band_cost||0.86,pSup);
+    // Tension bands: 3 per terminal for 4ft fence, 4 per terminal for 6ft+
+    const tensionBandsEach = hft<=4 ? 3 : 4;
+    add('Hardware','Tension Band',termPosts*tensionBandsEach,'EA',prod.tension_band_cost||0.86,pSup);
     add('Hardware','Brace Band',termPosts*2,'EA',prod.brace_band_cost||0.93,pSup);
-    add('Hardware','Tension Bar',termPosts,'EA',prod.tension_bar_cost||4.95,pSup);
+    // Tension bars: 1 per terminal post + 1 per 50ft mesh roll splice (roll ends inside the run)
+    const meshSplices = Math.max(0, Math.ceil(lf/50) - 1);
+    add('Hardware','Tension Bar',termPosts+meshSplices,'EA',prod.tension_bar_cost||4.95,pSup);
     add('Hardware','1 3/8" Rail End',termPosts,'EA',prod.rail_end_cost||1.39,pSup);
     add('Hardware','5/16" Carriage Bolt',termPosts*3,'EA',prod.carriage_bolt_cost||0.25,pSup);
     add('Hardware','Wire Tie Bag (158ct)',Math.ceil(lf/100),'BAG',prod.wire_tie_cost||8.45,pSup);
@@ -3682,6 +3687,15 @@ function buildBOM(){
     if(gDbl)  add('Gates',`${hft}ft Double Drive Gate`,gDbl,'EA',gr.dbl,pSup);
     if(gCustQ&&gCustW) add('Gates',`Custom ${gCustW}ft Gate`,gCustQ,'EA',gCustW*P.gateCustomAlCl);
     if(state.addons.has('black_vinyl_mesh')) add('Add-On','Black PVC Mesh Upgrade',1,'NOTE',0);
+    if(state.addons.has('bottom_wire')){
+      const bw=prod.addons?.find(a=>a.key==='bottom_wire');
+      const wireCoils=Math.ceil(lf/150);
+      const wireCost=bw?.cost_value||13.35;
+      const wireSup=bw?.supplier||pSup;
+      add('Add-On','9ga Tension Wire Coil (150ft)',wireCoils,'EA',wireCost,wireSup);
+      // Hog rings attach bottom wire to mesh at each line post (~2 per post), sold in bags of 100
+      add('Add-On','Hog Rings (bag of 100)',Math.ceil(linePosts*2/100)||1,'BAG',prod.hog_ring_bag_cost||6.50,wireSup);
+    }
     if(state.addons.has('barb_wire')){
       const ba=prod.addons?.find(a=>a.key==='barb_wire');
       add('Add-On','Barbed Wire 3-strand Top',lf,'LF',ba?.cost_value||0.45,ba?.supplier||'Local');

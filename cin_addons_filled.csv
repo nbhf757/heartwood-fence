@@ -25,7 +25,8 @@ cin_alum_4ft,gate_walk,Walk Gate,kit,295.06,Imperial Fence,"Gate panel $194.21 +
 cin_alum_4ft,gate_double,Double Drive Gate,kit,530.12,Imperial Fence,"2x gate panels $388.42 + 2x hinge pairs $81.70 + latch+lock $60. 2 hinge-side gate posts billed separately."
 cin_alum_6ft,gate_walk,Walk Gate,kit,454.45,Imperial Fence,Gate panel $331.25 + hinge pair $85.80 + latch $37.40. Hinge-side gate post ($72) billed separately.
 cin_alum_6ft,gate_double,Double Drive Gate,kit,871.50,Imperial Fence,2x gate panels $662.50 + 2x hinge pairs $171.60 + latch $37.40. 2 hinge-side gate posts billed separately.
-cin_chainlink,black_vinyl_upgrade,Black Vinyl Coated Mesh,lf,?,Master Halco,Upcharge per LF over galvanized ($4.66) — or enter full black mesh cost and leave galvanized as base
+cin_chainlink,bottom_wire,Bottom Tension Wire,lf,?,Master Halco,9ga coil wire — need $/lf or coil price from Master Halco; hog ring bag cost also needed
+cin_chainlink,black_vinyl_upgrade,Black Vinyl Coated Mesh,lf,?,Master Halco,Upcharge per LF over galvanized ($3.72) — or enter full black mesh cost and leave galvanized as base
 cin_chainlink,barb_wire,Barb Wire,lf,unknown,?,Cost per LF
 cin_chainlink,privacy_slats,Privacy Slats,lf,unknown,?,Cost per LF
 cin_chainlink,gate_walk,Walk Gate,kit,225,Master Halco,Prefab kit — fixed cost per gate
