@@ -1445,6 +1445,8 @@ const FALLBACK_PRODUCTS = [
       {key:'lattice_top',    label:'Lattice Top',      cost_type:'ea',  cost_value:25.00, supplier:'Lowes'},
       {key:'top_cap_fascia', label:'Top Cap & Fascia', cost_type:'ea',  cost_value:10.00, supplier:'Mills'},
       {key:'gaps_in_pickets',label:'Gaps in Pickets',  cost_type:'ea',  cost_value:0,     supplier:'n/a'},
+      {key:'pool_hinge',     label:'Pool Hinges (auto-close)', cost_type:'kit', cost_value:0, supplier:'The Home Depot'},
+      {key:'pool_latch',     label:'Pool Latch',       cost_type:'kit', cost_value:0,     supplier:'The Home Depot'},
     ],
   },
   { branch:'CIN', product_id:'cin_wood_privacy_pt_8ft', product_name:'Dog Ear Privacy — PT Pine (8ft)',
@@ -1458,6 +1460,8 @@ const FALLBACK_PRODUCTS = [
     addons:[
       {key:'board_on_board', label:'Board on Board',   cost_type:'ea',  cost_value:3.90,  supplier:'Mills'},
       {key:'top_cap_fascia', label:'Top Cap & Fascia', cost_type:'ea',  cost_value:10.00, supplier:'Mills'},
+      {key:'pool_hinge',     label:'Pool Hinges (auto-close)', cost_type:'kit', cost_value:0, supplier:'The Home Depot'},
+      {key:'pool_latch',     label:'Pool Latch',       cost_type:'kit', cost_value:0,     supplier:'The Home Depot'},
     ],
   },
   { branch:'CIN', product_id:'cin_wood_privacy_cedar', product_name:'Dog Ear Privacy — Cedar',
@@ -1472,6 +1476,8 @@ const FALLBACK_PRODUCTS = [
       {key:'board_on_board', label:'Board on Board',   cost_type:'ea',  cost_value:4.79,  supplier:'SPS'},
       {key:'lattice_top',    label:'Lattice Top',      cost_type:'ea',  cost_value:25.00, supplier:'Lowes'},
       {key:'top_cap_fascia', label:'Top Cap & Fascia', cost_type:'ea',  cost_value:10.00, supplier:'TBD'},
+      {key:'pool_hinge',     label:'Pool Hinges (auto-close)', cost_type:'kit', cost_value:0, supplier:'The Home Depot'},
+      {key:'pool_latch',     label:'Pool Latch',       cost_type:'kit', cost_value:0,     supplier:'The Home Depot'},
     ],
   },
   { branch:'CIN', product_id:'cin_wood_horiz_cap', product_name:'Horizontal Privacy with Cap',
@@ -1974,9 +1980,14 @@ function gateRates(){
     const gD=prod.addons.find(a=>a.key==='gate_double'&&a.cost_type==='kit');
     if(gW||gD) return {walk:gW?.cost_value||0, dbl:gD?.cost_value||0, cust:0};
   }
-  return {walk:m==='wood'?P.gateWalkWood:m==='vinyl'?P.gateWalkVinyl:P.gateWalkAlCl,
-          dbl: m==='wood'?P.gateDblWood :m==='vinyl'?P.gateDblVinyl :P.gateDblAlCl,
-          cust:m==='wood'?P.gateCustomWood:m==='vinyl'?P.gateCustomVinyl:P.gateCustomAlCl};
+  let walk=m==='wood'?P.gateWalkWood:m==='vinyl'?P.gateWalkVinyl:P.gateWalkAlCl;
+  let dbl =m==='wood'?P.gateDblWood :m==='vinyl'?P.gateDblVinyl :P.gateDblAlCl;
+  let cust=m==='wood'?P.gateCustomWood:m==='vinyl'?P.gateCustomVinyl:P.gateCustomAlCl;
+  if(m==='wood'){
+    if(state.addons.has('pool_latch')) { walk+=25; dbl+=25; cust+=25; }
+    if(state.addons.has('pool_hinge')) { walk+=(40-8.50)*3; dbl+=(40-8.50)*6; cust+=(40-8.50)*3; }
+  }
+  return {walk, dbl, cust};
 }
 
 // ── Main recalc ────────────────────────────────────────────
@@ -3446,28 +3457,43 @@ function buildBOM(){
   // ── Shared helper: wood gate materials (Z-frame cedar, pickets, hardware) ──
   function addWoodGates(picketDesc, picketCost, picketSup, derivedGatePosts, gPostCost, gPostSup, gPostLabel){
     if(derivedGatePosts>0) add('Gate Posts', gPostLabel, derivedGatePosts, 'EA', gPostCost, gPostSup);
-    const cedarFrm=5.50, pickPerFt=(12/5.5)*1.02;
+    const cedarFrm8=5.50, cedarFrm10=8.00, pickPerFt=(12/5.5)*1.02;
+    const poolHinge=state.addons.has('pool_hinge');
+    const poolLatch=state.addons.has('pool_latch');
+    const hingeCost=poolHinge?40:8.50;
+    const latchCost=poolLatch?40:15;
+    const hingeLabel=poolHinge?'Gate Hinge — Pool / Auto-Close':'Gate Hinge — Heavy Duty';
+    const latchLabel=poolLatch?'Gate Latch — Pool Self-Closing':'Gate Latch';
     if(gWalk>0){
-      const fb=Math.ceil((8+2*hft+Math.hypot(4,hft))/8);
-      add('Gate Frame','2x4x8 Frame Board — Cedar',gWalk*fb,'EA',cedarFrm,'Local Lumber Co');
+      // 4ft walk gate: 4 × 2x4x8
+      add('Gate Frame','2x4x8 Frame Board — Cedar',gWalk*4,'EA',cedarFrm8,'Local Lumber Co');
       add('Gate Pickets',picketDesc,gWalk*Math.ceil(4*pickPerFt),'EA',picketCost,picketSup);
-      add('Gate Hardware','Gate Hinge — Heavy Duty',gWalk*3,'EA',8.50,'The Home Depot');
-      add('Gate Hardware','Gate Latch — allowance',gWalk,'EA',0,'TBD');
+      add('Gate Hardware',hingeLabel,gWalk*3,'EA',hingeCost,'The Home Depot');
+      add('Gate Hardware',latchLabel,gWalk,'EA',latchCost,'The Home Depot');
+      add('Gate Hardware','Tension Cable',gWalk,'EA',16,'The Home Depot');
     }
     if(gDbl>0){
-      const fb=Math.ceil((8+2*hft+Math.hypot(5,hft))/8)*2;
-      add('Gate Frame','2x4x8 Frame Board — Cedar',gDbl*fb,'EA',cedarFrm,'Local Lumber Co');
+      // Double gate: 2 leaves each 5ft — 2×2x4x10 + 2×2x4x8 per leaf → 4+4 total
+      add('Gate Frame','2x4x10 Frame Board — Cedar',gDbl*4,'EA',cedarFrm10,'Local Lumber Co');
+      add('Gate Frame','2x4x8 Frame Board — Cedar',gDbl*4,'EA',cedarFrm8,'Local Lumber Co');
       add('Gate Pickets',picketDesc,gDbl*Math.ceil(10*pickPerFt),'EA',picketCost,picketSup);
-      add('Gate Hardware','Gate Hinge — Heavy Duty',gDbl*6,'EA',8.50,'The Home Depot');
-      add('Gate Hardware','Gate Latch — allowance',gDbl,'EA',0,'TBD');
+      add('Gate Hardware',hingeLabel,gDbl*6,'EA',hingeCost,'The Home Depot');
+      add('Gate Hardware',latchLabel,gDbl,'EA',latchCost,'The Home Depot');
+      add('Gate Hardware','Tension Cable',gDbl,'EA',16,'The Home Depot');
       add('Gate Hardware','Cane Bolt / Drop Rod',gDbl,'EA',12.50,'The Home Depot');
     }
     if(gCustQ&&gCustW){
-      const fb=Math.ceil((8+2*hft+Math.hypot(gCustW,hft))/8);
-      add('Gate Frame','2x4x8 Frame Board — Cedar',gCustQ*fb,'EA',cedarFrm,'Local Lumber Co');
+      const wideFrm=gCustW>4;
+      if(wideFrm){
+        add('Gate Frame','2x4x10 Frame Board — Cedar',gCustQ*2,'EA',cedarFrm10,'Local Lumber Co');
+        add('Gate Frame','2x4x8 Frame Board — Cedar',gCustQ*2,'EA',cedarFrm8,'Local Lumber Co');
+      } else {
+        add('Gate Frame','2x4x8 Frame Board — Cedar',gCustQ*4,'EA',cedarFrm8,'Local Lumber Co');
+      }
       add('Gate Pickets',picketDesc,gCustQ*Math.ceil(gCustW*pickPerFt),'EA',picketCost,picketSup);
-      add('Gate Hardware','Gate Hinge — Heavy Duty',gCustQ*3,'EA',8.50,'The Home Depot');
-      add('Gate Hardware','Gate Latch — allowance',gCustQ,'EA',0,'TBD');
+      add('Gate Hardware',hingeLabel,gCustQ*3,'EA',hingeCost,'The Home Depot');
+      add('Gate Hardware',latchLabel,gCustQ,'EA',latchCost,'The Home Depot');
+      add('Gate Hardware','Tension Cable',gCustQ,'EA',16,'The Home Depot');
     }
   }
 
