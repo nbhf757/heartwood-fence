@@ -3457,7 +3457,7 @@ function buildBOM(){
   // ── Shared helper: wood gate materials (Z-frame cedar, pickets, hardware) ──
   function addWoodGates(picketDesc, picketCost, picketSup, derivedGatePosts, gPostCost, gPostSup, gPostLabel){
     if(derivedGatePosts>0) add('Gate Posts', gPostLabel, derivedGatePosts, 'EA', gPostCost, gPostSup);
-    const cedarFrm8=12.00, cedarFrm10=12.00, pickPerFt=(12/5.5)*1.02;
+    const cedarFrm8=12.00, cedarFrm10=18.00, pickPerFt=(12/5.5)*1.02;
     const poolHinge=state.addons.has('pool_hinge');
     const poolLatch=state.addons.has('pool_latch');
     const hingeCost=poolHinge?40:8.50;
